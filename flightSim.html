@@ -1,0 +1,2741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>N2O / Ethanol 6DOF Flight Simulator</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c222b; --line:#2a323d;
+    --text:#dbe3ec; --muted:#8b97a8; --accent:#ff7a45; --accent2:#4dd0e1;
+    --good:#7bd88f; --warn:#f2c14e; --bad:#e06c75; --purple:#b48ead;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overflow:hidden;
+  }
+  .app{display:flex;height:100vh}
+
+  /* ---------- sidebar ---------- */
+  aside{
+    width:320px;min-width:320px;height:100%;overflow-y:auto;
+    background:var(--panel);border-right:1px solid var(--line);
+  }
+  aside::-webkit-scrollbar,main::-webkit-scrollbar{width:10px}
+  aside::-webkit-scrollbar-thumb,main::-webkit-scrollbar-thumb{
+    background:#333c48;border-radius:5px}
+  .brand{
+    padding:14px 16px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--panel);z-index:5}
+  .brand h1{margin:0;font-size:14px;font-weight:650;letter-spacing:.2px}
+  .brand p{margin:3px 0 0;font-size:11px;color:var(--muted)}
+  .brand p.by{margin-top:5px;font-size:11.5px;color:var(--accent);
+    font-weight:600;letter-spacing:.2px}
+  .actions{display:flex;gap:6px;padding:10px 12px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line);position:sticky;top:57px;
+    background:var(--panel);z-index:4}
+  button{
+    font:inherit;font-size:12px;padding:6px 11px;border-radius:6px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--text);
+    cursor:pointer;transition:.12s}
+  button:hover{background:#28303b;border-color:#3a4553}
+  button.primary{background:var(--accent);border-color:var(--accent);
+    color:#1a0d06;font-weight:650}
+  button.primary:hover{background:#ff8f60}
+  button:disabled{opacity:.5;cursor:default}
+  details{border-bottom:1px solid var(--line)}
+  summary{
+    padding:9px 14px;cursor:pointer;font-weight:600;font-size:11.5px;
+    letter-spacing:.6px;text-transform:uppercase;color:var(--muted);
+    user-select:none;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸";display:inline-block;width:14px;
+    transition:transform .15s;color:#5c6b7e}
+  details[open] summary::before{transform:rotate(90deg)}
+  summary:hover{color:var(--text)}
+  .fields{padding:2px 14px 12px}
+  .f{display:flex;align-items:center;gap:8px;margin:5px 0}
+  .f label{flex:1;font-size:12px;color:#b6c2d1}
+  .f .u{width:52px;font-size:10.5px;color:var(--muted);text-align:left}
+  .f input,.f select{
+    width:84px;padding:4px 6px;font:inherit;font-size:12px;
+    background:#0d1117;color:var(--text);
+    border:1px solid var(--line);border-radius:5px;text-align:right}
+  .f select{text-align:left;width:84px}
+  .f input:focus,.f select:focus{outline:none;border-color:var(--accent2)}
+  .f input.bad{border-color:var(--bad)}
+  .derived{margin:8px 14px 12px;padding:8px 10px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:6px;font-size:11.5px}
+  .derived div{display:flex;justify-content:space-between;margin:2px 0;
+    color:var(--muted)}
+  .derived b{color:var(--text);font-weight:600}
+
+  /* ---------- main ---------- */
+  main{flex:1;height:100%;overflow-y:auto;padding:14px 16px 40px}
+  .status{
+    display:flex;align-items:center;gap:10px;margin-bottom:12px;
+    font-size:12px;color:var(--muted);min-height:20px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+  .dot.run{background:var(--warn);animation:pulse 1s infinite}
+  .dot.ok{background:var(--good)}
+  .dot.err{background:var(--bad)}
+  @keyframes pulse{50%{opacity:.3}}
+  .banner{padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:12px;
+    border:1px solid;display:none}
+  .banner.show{display:block}
+  .banner.warn{background:rgba(242,193,78,.09);border-color:rgba(242,193,78,.45);
+    color:#f0cf87}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));
+    gap:8px;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);
+    border-radius:7px;padding:9px 11px}
+  .card .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .v{font-size:17px;font-weight:650;margin-top:3px;
+    font-variant-numeric:tabular-nums}
+  .card .v small{font-size:11px;font-weight:500;color:var(--muted);
+    margin-left:2px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(370px,1fr));
+    gap:12px}
+  .plot{background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:8px}
+  .plot canvas{width:100%;height:230px;display:block;cursor:crosshair}
+  .plot.wide{grid-column:1/-1}
+  .plot.wide canvas{height:400px}
+  button.mc{background:#2b3a4a;border-color:#3a4f66;color:#cfe6f5}
+  button.mc:hover{background:#35485c}
+  .dispnote{margin:0 14px 8px;font-size:11px;color:var(--muted);
+    line-height:1.4}
+  .preset{display:flex;gap:6px;margin-top:7px}
+  .preset button{font-size:11px;padding:4px 8px}
+  #grpSigma .f label{font-size:11.5px}
+  #grpSigma .f input{width:66px}
+  #grpSigma .f .u{width:38px}
+  .prog{height:4px;background:#0d1117;border-radius:2px;overflow:hidden;
+    flex:1;max-width:220px}
+  .prog i{display:block;height:100%;width:0;background:var(--accent2);
+    transition:width .1s}
+  table{border-collapse:collapse;width:100%;font-size:11.5px;
+    font-variant-numeric:tabular-nums}
+  th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--line);
+    white-space:nowrap}
+  th{color:var(--muted);font-weight:600;text-transform:uppercase;
+    font-size:10px;letter-spacing:.5px;position:sticky;top:0;
+    background:var(--panel)}
+  td:first-child,th:first-child{text-align:left}
+  .sect{font-size:11px;letter-spacing:.7px;text-transform:uppercase;
+    color:var(--muted);margin:20px 0 8px;font-weight:600}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;
+    align-items:center;justify-content:center;z-index:50}
+  .modal.show{display:flex}
+  .modal .box{background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;width:min(760px,92vw);max-height:82vh;
+    display:flex;flex-direction:column}
+  .modal .box header{padding:12px 16px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center}
+  .modal .box textarea{flex:1;min-height:52vh;margin:0;border:0;resize:none;
+    background:#0d1117;color:var(--text);padding:14px;font:12px/1.5
+    ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .modal .box footer{padding:10px 16px;border-top:1px solid var(--line);
+    display:flex;gap:8px;justify-content:flex-end}
+  @media(max-width:820px){
+    body{overflow:auto}
+    .app{flex-direction:column;height:auto}
+    aside{width:100%;min-width:0;height:auto;border-right:0;
+      border-bottom:1px solid var(--line)}
+    main{height:auto;overflow:visible}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<aside>
+  <div class="brand">
+    <h1>N<sub>2</sub>O / Ethanol 6DOF Flight Sim</h1>
+    <p>Coupled engine + rigid-body, quaternion attitude, RK45</p>
+    <p class="by">by Alessandro Valente</p>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="btnRun">▶ Run</button>
+    <button class="mc" id="btnMc">▶▶ Monte Carlo</button>
+    <button id="btnReset">Reset</button>
+    <button id="btnCsv">CSV</button>
+    <button id="btnMat">MATLAB</button>
+  </div>
+
+  <div class="derived" id="derived"></div>
+
+  <details open>
+    <summary>Engine</summary>
+    <div class="fields" id="grpEngine"></div>
+  </details>
+  <details open>
+    <summary>Airframe</summary>
+    <div class="fields" id="grpAirframe"></div>
+  </details>
+  <details>
+    <summary>Mass &amp; inertia</summary>
+    <div class="fields" id="grpMass"></div>
+  </details>
+  <details>
+    <summary>Fins</summary>
+    <div class="fields" id="grpFins"></div>
+  </details>
+  <details open>
+    <summary>Launch &amp; environment</summary>
+    <div class="fields" id="grpEnv"></div>
+  </details>
+  <details>
+    <summary>Solver</summary>
+    <div class="fields" id="grpSolver"></div>
+  </details>
+  <details id="detDisp">
+    <summary>Dispersions (1σ)</summary>
+    <div class="fields" id="grpMcRun"></div>
+    <div class="dispnote">
+      Gaussian, truncated at ±3σ. Wind direction and misalignment clock
+      angles are uniform. Set any σ to 0 to freeze that input.
+      <span class="preset">
+        <button id="btnSigDefault">Defaults</button>
+        <button id="btnSigZero">All zero</button>
+      </span>
+    </div>
+    <div class="fields" id="grpSigma"></div>
+  </details>
+</aside>
+
+<main>
+  <div class="status">
+    <span class="dot" id="dot"></span><span id="statusTxt">Ready</span>
+    <span class="prog" id="prog" style="display:none"><i id="progBar"></i></span>
+  </div>
+  <div class="banner warn" id="banner"></div>
+  <div class="cards" id="cards"></div>
+
+  <div class="sect">Trajectory</div>
+  <div class="grid">
+    <div class="plot"><canvas id="pTraj"></canvas></div>
+    <div class="plot"><canvas id="pGround"></canvas></div>
+    <div class="plot"><canvas id="pAlt"></canvas></div>
+    <div class="plot"><canvas id="pSpeed"></canvas></div>
+  </div>
+
+  <div class="sect">Propulsion</div>
+  <div class="grid">
+    <div class="plot"><canvas id="pThrust"></canvas></div>
+    <div class="plot"><canvas id="pPress"></canvas></div>
+  </div>
+
+  <div class="sect">Stability &amp; attitude</div>
+  <div class="grid">
+    <div class="plot"><canvas id="pAlpha"></canvas></div>
+    <div class="plot"><canvas id="pMargin"></canvas></div>
+    <div class="plot"><canvas id="pRates"></canvas></div>
+    <div class="plot"><canvas id="pTilt"></canvas></div>
+  </div>
+
+  <div class="sect">Loads</div>
+  <div class="grid">
+    <div class="plot"><canvas id="pQbar"></canvas></div>
+    <div class="plot"><canvas id="pAccel"></canvas></div>
+  </div>
+
+  <div id="mcBlock" style="display:none">
+    <div class="sect" id="mcHead">Monte Carlo dispersions</div>
+    <div class="banner warn" id="mcBanner"></div>
+    <div class="cards" id="mcCards"></div>
+    <div class="grid">
+      <div class="plot wide"><canvas id="pFootprint"></canvas></div>
+      <div class="plot"><canvas id="pSens"></canvas></div>
+      <div class="plot"><canvas id="pHistApogee"></canvas></div>
+      <div class="plot"><canvas id="pHistRange"></canvas></div>
+      <div class="plot"><canvas id="pSpagAlt"></canvas></div>
+      <div class="plot"><canvas id="pSpagDr"></canvas></div>
+      <div class="plot"><canvas id="pHistMach"></canvas></div>
+      <div class="plot"><canvas id="pHistQ"></canvas></div>
+    </div>
+    <div class="sect">Percentiles</div>
+    <div class="plot" style="padding:0;overflow:auto">
+      <table id="mcTable"></table>
+    </div>
+  </div>
+</main>
+</div>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <header><b id="modalTitle">Export</b><button id="modalClose">Close</button></header>
+    <textarea id="modalText" spellcheck="false"></textarea>
+    <footer>
+      <button id="modalCopy">Copy to clipboard</button>
+      <button class="primary" id="modalDl">Download</button>
+    </footer>
+  </div>
+</div>
+
+<script>
+/* ============================ PHYSICS CORE ============================ */
+/* =====================================================================
+   N2O / Ethanol 6DOF flight simulator - physics core
+   Direct port of the MATLAB model:
+     thermoData.m / thermoProperties.m / combustionSolver.m /
+     nozzlePerformance.m / engineDynamics.m  (engine, unchanged logic)
+     atmosphereISA.m / aeroCoefficients.m / massProperties.m /
+     quatToDcm.m / flightDynamics.m         (6DOF)
+   Integrator: Dormand-Prince RK45 with adaptive step + event location
+   (same order and error control as MATLAB's ode45).
+   ===================================================================== */
+(function (root) {
+'use strict';
+
+var G0 = 9.80665;          // standard gravity                     m/s^2
+var R_EARTH = 6.371e6;     // mean Earth radius                    m
+var RUNIV = 8314.462618;   // universal gas constant               J/(kmol*K)
+
+/* ---------------- thermoData ---------------- */
+var HF = { ethanolLiq:-277000, n2oLiq:64650, co2:-393510, co:-110530,
+           h2o:-241826, h2:0, n2:0, o2:0 };                 // J/mol
+var MWt = { ethanol:46.069, n2o:44.013, co2:44.010, co:28.010,
+            h2o:18.015, h2:2.016, n2:28.014, o2:31.998 };   // kg/kmol
+var CP_GRAPHITE = 20.8;                                     // J/(mol*K)
+
+var NASA = {
+  co2:{tLow:200,tMid:1000,tHigh:6000,
+    low:[2.35677352e0,8.98459677e-3,-7.12356269e-6,2.45919022e-9,-1.43699548e-13,-4.83719697e4,9.90105222e0],
+    high:[4.63659493e0,2.74131991e-3,-9.95828531e-7,1.60373011e-10,-9.16103468e-15,-4.90249341e4,-1.93534855e0]},
+  co:{tLow:200,tMid:1000,tHigh:6000,
+    low:[3.57953347e0,-6.10353680e-4,1.01681433e-6,9.07005884e-10,-9.04424499e-13,-1.43440860e4,3.50840928e0],
+    high:[2.71518561e0,2.06252743e-3,-9.98825771e-7,2.30053008e-10,-2.03647716e-14,-1.41518724e4,7.81868772e0]},
+  h2o:{tLow:200,tMid:1000,tHigh:6000,
+    low:[4.19864056e0,-2.03643410e-3,6.52040211e-6,-5.48797062e-9,1.77197817e-12,-3.02937267e4,-8.49032208e-1],
+    high:[2.67703787e0,2.97318329e-3,-7.73769690e-7,9.44336689e-11,-4.26900959e-15,-2.98858938e4,6.88255571e0]},
+  h2:{tLow:200,tMid:1000,tHigh:6000,
+    low:[2.34433112e0,7.98052075e-3,-1.94781510e-5,2.01572094e-8,-7.37611761e-12,-9.17935173e2,6.83010238e0],
+    high:[3.33727920e0,-4.94024731e-5,4.99456778e-7,-1.79566394e-10,-2.00255376e-14,-9.50158922e2,-3.20502331e0]},
+  n2:{tLow:200,tMid:1000,tHigh:6000,
+    low:[3.53100528,-1.23660988e-4,-5.02999433e-7,2.43530612e-9,-1.40881235e-12,-1.04697628e3,2.96747038],
+    high:[2.95257637,1.39690040e-3,-4.92631603e-7,7.86010195e-11,-4.60755204e-15,-9.23948688e2,5.87188762]},
+  o2:{tLow:200,tMid:1000,tHigh:6000,
+    low:[3.78245636,-2.99673416e-3,9.84730201e-6,-9.68129509e-9,3.24372837e-12,-1.06394356e3,3.65767573],
+    high:[3.66096065,6.56365811e-4,-1.41149627e-7,2.05797935e-11,-1.29913436e-15,-1.21597718e3,3.41536279]}
+};
+
+/* thermoProperties.m -> [cp J/(mol*K), h J/mol] */
+function thermoProps(sp, T) {
+  var s = NASA[sp];
+  var t = Math.min(Math.max(T, s.tLow), s.tHigh);
+  var a = (t <= s.tMid) ? s.low : s.high;
+  var t2 = t*t, t3 = t2*t, t4 = t3*t;
+  var cp = (a[0] + a[1]*t + a[2]*t2 + a[3]*t3 + a[4]*t4) * RUNIV / 1000;
+  var h  = (a[0] + a[1]*t/2 + a[2]*t2/3 + a[3]*t3/4 + a[4]*t4/5 + a[5]/t)
+           * RUNIV * t / 1000;
+  return [cp, h];
+}
+
+/* Bisection root finder on a bracketed sign change (fzero stand-in) */
+function bisect(f, lo, hi, tol, maxIt) {
+  tol = tol || 1e-10; maxIt = maxIt || 200;
+  var fl = f(lo), fh = f(hi);
+  if (fl === 0) return lo;
+  if (fh === 0) return hi;
+  if (fl * fh > 0) return NaN;             // not bracketed
+  for (var i = 0; i < maxIt; i++) {
+    var mid = 0.5 * (lo + hi);
+    var fm = f(mid);
+    if (fm === 0 || (hi - lo) < tol) return mid;
+    if (fl * fm < 0) { hi = mid; fh = fm; } else { lo = mid; fl = fm; }
+  }
+  return 0.5 * (lo + hi);
+}
+
+/* combustionSolver.m - depends only on ofRatio, so cache it */
+var combCache = {};
+function combustionSolver(ofRatio) {
+  var key = ofRatio.toFixed(10);
+  if (combCache[key]) return combCache[key];
+
+  var tRef = 298.15;
+  var nuStoich = 6;
+  var ofStoich = nuStoich * MWt.n2o / MWt.ethanol;
+
+  var nFuel = 1.0;
+  var nN2O = ofRatio * MWt.ethanol / MWt.n2o;
+  var nC = 2*nFuel, nH = 6*nFuel, nO = nFuel + nN2O, nN = 2*nN2O;
+
+  // oxygen-allocation waterfall (identical to the MATLAB version)
+  var oLeft = nO;
+  var nH2O = Math.min(nH/2, oLeft); oLeft -= nH2O;
+  var nH2  = nH/2 - nH2O;
+  var nCO  = Math.min(nC, oLeft);   oLeft -= nCO;
+  var nCs  = nC - nCO;
+  var nCO2 = Math.min(nCO, oLeft);  oLeft -= nCO2;
+  nCO -= nCO2;
+  var nO2 = oLeft/2, nN2 = nN/2;
+
+  var hReact = nFuel*HF.ethanolLiq + nN2O*HF.n2oLiq;
+  var species = ['co2','co','h2o','h2','n2','o2'];
+  var nList = [nCO2, nCO, nH2O, nH2, nN2, nO2];
+  var hfList = [HF.co2, HF.co, HF.h2o, HF.h2, HF.n2, HF.o2];
+
+  function residual(t) {
+    var hProd = 0;
+    for (var k = 0; k < species.length; k++) {
+      if (nList[k] <= 0) continue;
+      var hAtT = thermoProps(species[k], t)[1];
+      var hAtRef = thermoProps(species[k], tRef)[1];
+      hProd += nList[k] * (hfList[k] + hAtT - hAtRef);
+    }
+    hProd += nCs * CP_GRAPHITE * (t - tRef);
+    return hProd - hReact;
+  }
+
+  var tChamber = bisect(residual, 500, 5500, 1e-8);
+  if (!isFinite(tChamber)) {                       // fallback: grid search
+    var best = 500, bestR = Infinity;
+    for (var i = 0; i < 200; i++) {
+      var tg = 500 + i*(5000/199), r = Math.abs(residual(tg));
+      if (r < bestR) { bestR = r; best = tg; }
+    }
+    tChamber = best;
+  }
+
+  var nTotal = nCO2 + nCO + nH2O + nH2 + nN2 + nO2;
+  var x = nList.map(function (n) { return n / nTotal; });
+  var cpMix = 0, mwMix = 0;
+  for (var j = 0; j < species.length; j++) {
+    cpMix += x[j] * thermoProps(species[j], tChamber)[0];
+    mwMix += x[j] * MWt[species[j]];
+  }
+  var out = {
+    tChamber: tChamber,
+    gamma: cpMix / (cpMix - RUNIV/1000),
+    mwMix: mwMix,
+    rSpec: RUNIV / mwMix,
+    cpMix: cpMix,
+    ofStoich: ofStoich,
+    moleFrac: { co2:x[0], co:x[1], h2o:x[2], h2:x[3], n2:x[4], o2:x[5] },
+    nUnburntC: nCs
+  };
+  combCache[key] = out;
+  return out;
+}
+
+/* nozzlePerformance.m - exit Mach depends only on (gamma, area ratio) */
+var machCache = {};
+function exitMach(gamma, eps) {
+  var key = gamma.toFixed(10) + '|' + eps.toFixed(10);
+  if (machCache[key] !== undefined) return machCache[key];
+  var gp1 = gamma + 1, gm1 = gamma - 1;
+  var f = function (m) {
+    return (1/m) * Math.pow((2/gp1)*(1 + gm1/2*m*m), gp1/(2*gm1)) - eps;
+  };
+  var me = bisect(f, 1.0001, 50, 1e-12);
+  if (!isFinite(me)) me = 1.0;
+  machCache[key] = me;
+  return me;
+}
+
+function nozzlePerformance(pChamber, tChamber, gamma, rSpec, mDot, P, pAmb) {
+  var aThroat = P.aThroat, aExit = P.aExit;
+  var eps = aExit / aThroat;
+  var gp1 = gamma + 1, gm1 = gamma - 1;
+  var gamTerm = Math.sqrt(gamma) * Math.pow(2/gp1, gp1/(2*gm1));
+  var cStar = Math.sqrt(rSpec * tChamber) / gamTerm;
+
+  var mExit = exitMach(gamma, eps);
+  var f = 1 + gm1/2 * mExit*mExit;
+  var pExit = pChamber * Math.pow(f, -gamma/gm1);
+  var tExit = tChamber / f;
+  var vExit = mExit * Math.sqrt(gamma * rSpec * tExit);
+
+  var thrust = mDot * vExit + (pExit - pAmb) * aExit;
+  var cf = (pChamber * aThroat > 0) ? thrust / (pChamber * aThroat) : 0;
+  var isp;
+  if (mDot > 1e-6) { isp = thrust / (mDot * G0); }
+  else { isp = 0; thrust = 0; }
+  return { thrust:thrust, isp:isp, mExit:mExit, pExit:pExit,
+           cStar:cStar, cf:cf };
+}
+
+/* engineDynamics.m - y = [mFuel, mOx, pChamber, pTank] */
+function engineDynamics(y, P, pAmbient) {
+  var mFuel = Math.max(y[0], 0);
+  var mOx   = Math.max(y[1], 0);
+  var pChamber = Math.max(y[2], 1e3);
+  var pTank = Math.max(y[3], pChamber);
+
+  var rhoMix = (1 + P.ofRatio) / (1/P.rhoFuel + P.ofRatio/P.rhoOx);
+  var dP = Math.max(pTank - pChamber, 0);
+  var mDotTotal = P.kInj * Math.sqrt(2 * rhoMix * dP);
+
+  var mDotFuel = mDotTotal / (1 + P.ofRatio);
+  var mDotOx = mDotTotal - mDotFuel;
+  if (mFuel <= 1e-3) mDotFuel = 0;
+  if (mOx   <= 1e-3) mDotOx = 0;
+  mDotTotal = mDotFuel + mDotOx;
+
+  var comb = combustionSolver(P.ofRatio);
+  var perf = nozzlePerformance(pChamber, comb.tChamber, comb.gamma,
+                               comb.rSpec, mDotTotal, P, pAmbient);
+
+  var vChamber = P.lStar * P.aThroat;
+  var aChamber = Math.sqrt(comb.gamma * comb.rSpec * comb.tChamber);
+  var tauC = vChamber / (P.aThroat * aChamber);
+  var pChamberSS = (mDotTotal > 1e-6)
+      ? mDotTotal * perf.cStar / P.aThroat : pAmbient;
+  var dPchamberDt = (pChamberSS - pChamber) / tauC;
+
+  var vUllage = P.vUllage0 + (P.mFuel0 - mFuel)/P.rhoFuel
+              + (P.mOx0 - mOx)/P.rhoOx;
+  var pTankSS = P.pTank0 * P.vUllage0 / vUllage;
+  var dPtankDt = (pTankSS - pTank) / 0.05;
+
+  return {
+    d: [-mDotFuel, -mDotOx, dPchamberDt, dPtankDt],
+    thrust: perf.thrust, isp: perf.isp, mDot: mDotTotal,
+    pChamber: pChamber, pTank: pTank, tChamber: comb.tChamber,
+    gamma: comb.gamma, mExit: perf.mExit, pExit: perf.pExit,
+    cStar: perf.cStar, cf: perf.cf
+  };
+}
+
+/* Equilibrium chamber pressure in closed form (see flightDynamics.m).
+   pc = K*sqrt(pt - pc)  =>  pc^2 + K^2 pc - K^2 pt = 0.
+   Removes the ~1 ms chamber mode that otherwise forces ~30k RK45 steps. */
+function chamberQuasiSteady(mFuel, mOx, pTank, P) {
+  var rhoMix = (1 + P.ofRatio) / (1/P.rhoFuel + P.ofRatio/P.rhoOx);
+  var fScale = 0;
+  if (mFuel > 1e-3) fScale += 1/(1 + P.ofRatio);
+  if (mOx   > 1e-3) fScale += P.ofRatio/(1 + P.ofRatio);
+  if (fScale <= 0) return 1e3;
+  var comb = combustionSolver(P.ofRatio);
+  var gp1 = comb.gamma + 1, gm1 = comb.gamma - 1;
+  var cStar = Math.sqrt(comb.rSpec * comb.tChamber)
+            / (Math.sqrt(comb.gamma) * Math.pow(2/gp1, gp1/(2*gm1)));
+  var k = fScale * P.kInj * Math.sqrt(2*rhoMix) * cStar / P.aThroat;
+  var pt = Math.max(pTank, 0);
+  return Math.max(0.5*(-k*k + Math.sqrt(k*k*k*k + 4*k*k*pt)), 1e3);
+}
+
+/* atmosphereISA.m - layer base values precomputed once */
+var ATM = (function () {
+  var rAir = 287.053;
+  var hBase = [0, 11000, 20000, 32000, 47000, 51000, 71000];
+  var lapse = [-6.5e-3, 0, 1.0e-3, 2.8e-3, 0, -2.8e-3, -2.0e-3];
+  var tBase = [288.15], pBase = [101325];
+  for (var i = 1; i < 7; i++) {
+    var dh = hBase[i] - hBase[i-1];
+    tBase[i] = tBase[i-1] + lapse[i-1]*dh;
+    if (Math.abs(lapse[i-1]) > 1e-12) {
+      pBase[i] = pBase[i-1] * Math.pow(tBase[i]/tBase[i-1],
+                                       -G0/(lapse[i-1]*rAir));
+    } else {
+      pBase[i] = pBase[i-1] * Math.exp(-G0*dh/(rAir*tBase[i-1]));
+    }
+  }
+  return { rAir:rAir, hBase:hBase, lapse:lapse, tBase:tBase, pBase:pBase };
+})();
+
+function atmosphereISA(h) {
+  var rAir = ATM.rAir;
+  var hC = Math.min(Math.max(h, 0), 86000);
+  var iL = 0;
+  for (var k = 6; k >= 0; k--) { if (hC >= ATM.hBase[k]) { iL = k; break; } }
+  var dh = hC - ATM.hBase[iL];
+  var t = ATM.tBase[iL] + ATM.lapse[iL]*dh;
+  var p;
+  if (Math.abs(ATM.lapse[iL]) > 1e-12) {
+    p = ATM.pBase[iL] * Math.pow(t/ATM.tBase[iL], -G0/(ATM.lapse[iL]*rAir));
+  } else {
+    p = ATM.pBase[iL] * Math.exp(-G0*dh/(rAir*ATM.tBase[iL]));
+  }
+  if (h > 86000) p *= Math.exp(-(h - 86000) / (rAir*t/G0));
+  var rho = p/(rAir*t);
+  // Sutherland's law for the dynamic viscosity of air (White, Viscous Fluid
+  // Flow, eq. 1-36): mu = 1.458e-6 T^1.5 / (T + 110.4)   [Pa s]
+  var mu = 1.458e-6 * Math.pow(t, 1.5) / (t + 110.4);
+  return { rho:rho, p:p, t:t, a:Math.sqrt(1.4*rAir*t), mu:mu, nu:mu/rho };
+}
+
+/* aeroCoefficients.m - geometry part cached per vehicle build */
+function aeroGeometry(V) {
+  var d = V.dBody, R = d/2;
+  /* --- Barrowman normal force (slender body + fins) --- */
+  var cNaNose = 2.0;                       // slender-body theory, any pointed nose
+  var xCpNose = (V.noseShape === 'cone') ? (2/3)*V.lNose : 0.466*V.lNose;
+  var s = V.finSpan, cr = V.finRootChord, ct = V.finTipChord, xt = V.finSweep;
+  var lMid = Math.sqrt(s*s + Math.pow(xt + 0.5*ct - 0.5*cr, 2));
+  var kTB = 1 + R/(s + R);                 // fin-body interference (Barrowman)
+  var cNaFins0 = kTB * (4*V.nFins*Math.pow(s/d, 2))
+               / (1 + Math.sqrt(1 + Math.pow(2*lMid/(cr + ct), 2)));
+  var xCpFins = V.xFinRootLE + (xt/3)*(cr + 2*ct)/(cr + ct)
+              + (1/6)*((cr + ct) - cr*ct/(cr + ct));
+
+  /* --- roll strip-theory arms: I1 = int y c dy, I2 = int y^2 c dy --- */
+  var dc = ct - cr;
+  var i1 = s*( R*cr + (R*dc + s*cr)/2 + s*dc/3 );
+  var i2 = s*( R*R*cr + (R*R*dc + 2*R*s*cr)/2
+             + (2*R*s*dc + s*s*cr)/3 + s*s*dc/4 );
+  var sFin = 0.5*(cr + ct)*s;              // one fin planform area
+
+  /* --- wetted areas (exact geometry, no shape fudge factors) --- */
+  var lNose = V.lNose, aWetNose;
+  if (V.noseShape === 'cone') {
+    aWetNose = Math.PI*R*Math.sqrt(R*R + lNose*lNose);   // cone lateral area
+  } else {
+    // tangent ogive: y(x) = sqrt(rho^2 - (L-x)^2) - (rho - R),
+    // rho = (R^2 + L^2)/(2R). Surface of revolution by Simpson's rule.
+    var rho = (R*R + lNose*lNose)/(2*R);
+    var n = 400, hStep = lNose/n, sum = 0;
+    for (var i = 0; i <= n; i++) {
+      var x = i*hStep;
+      var u = lNose - x;
+      var root = Math.sqrt(Math.max(rho*rho - u*u, 1e-12));
+      var y = root - (rho - R);
+      var dy = u/root;                                   // dy/dx
+      var f = 2*Math.PI*Math.max(y, 0)*Math.sqrt(1 + dy*dy);
+      var w = (i === 0 || i === n) ? 1 : (i % 2 ? 4 : 2);
+      sum += w*f;
+    }
+    aWetNose = sum*hStep/3;
+  }
+  var lBody = Math.max(V.lTotal - lNose, 0);
+  var aWetBody = aWetNose + Math.PI*d*lBody;
+  var aWetFins = 2*V.nFins*sFin;                          // both sides
+
+  /* --- nose pressure-drag geometry (OpenRocket techdoc App. B) --- */
+  var fN = lNose/d;                                       // fineness ratio
+  var sinEps = 1/Math.sqrt(1 + 4*fN*fN);                  // (B.3)
+  // ogive shape parameter: 1 = tangent ogive, 0 = cone (B.8)
+  var kappa = (V.noseShape === 'cone') ? 0 : 1;
+  // joint angle at the nose/body junction: zero for a tangent ogive,
+  // equal to the half-apex angle for a cone (eq. 3.86)
+  var jointAngle = (V.noseShape === 'cone') ? Math.asin(sinEps) : 0;
+
+  return {
+    cNaNose:cNaNose, xCpNose:xCpNose, cNaFins0:cNaFins0, xCpFins:xCpFins,
+    rollArm1:i1/sFin, rollArm2:i2/sFin,
+    sRef: Math.PI/4*d*d, sFin:sFin,
+    aWetBody:aWetBody, aWetFins:aWetFins, aWetNose:aWetNose,
+    fB: V.lTotal/d, fN:fN, sinEps:sinEps, kappa:kappa, jointAngle:jointAngle,
+    cBar: (2/3)*(cr + ct - cr*ct/(cr + ct)),   // mean aerodynamic chord
+    gammaLE: Math.atan2(xt, s),                // leading-edge sweep angle
+    aFinFrontal: V.nFins*(V.finThickness || 0)*s,
+    lRef: V.lTotal
+  };
+}
+
+/* =====================================================================
+   Zero-angle drag buildup.
+   All equations from the OpenRocket technical documentation (Niskanen,
+   2013), which collects them from Barrowman (1967) and Hoerner (1965).
+   Equation numbers below refer to that document.
+   ===================================================================== */
+
+/* Skin friction coefficient, eqs (3.78)-(3.84) */
+function skinFrictionCf(Re, rsOverL, mach) {
+  var Rcrit = 51*Math.pow(rsOverL, -1.039);              // (3.79)
+  var cfTurb = 1/Math.pow(1.50*Math.log(Math.max(Re, 1e4)) - 5.6, 2); // (3.78)
+  var cfRough = 0.032*Math.pow(rsOverL, 0.2);            // (3.80)
+  var cf, roughLimited = false;
+  if (Re < 1e4) { cf = 1.48e-2; }                        // (3.81)
+  else if (Re < Rcrit) { cf = cfTurb; }
+  else { cf = cfRough; roughLimited = true; }
+
+  if (mach < 1) return cf*(1 - 0.1*mach*mach);           // (3.82)
+  var cfcTurb = cfTurb/Math.pow(1 + 0.15*mach*mach, 0.58);  // (3.83)
+  if (!roughLimited) return cfcTurb;
+  var cfcRough = cfRough/(1 + 0.18*mach*mach);           // (3.84)
+  // "the corrected roughness-limited value should not be used if it would
+  //  yield a value smaller than the corresponding turbulent value"
+  return Math.max(cfcRough, cfcTurb);
+}
+
+/* Body base drag, eq (3.94) [Hoerner] */
+function baseCd(mach) {
+  return (mach < 1) ? (0.12 + 0.13*mach*mach) : (0.25/mach);
+}
+
+/* Fin leading-edge pressure drag, rounded edge, eq (3.89) [Barrowman] */
+function finLeadingEdgeCd(mach) {
+  if (mach < 0.9) return Math.pow(1 - mach*mach, -0.417) - 1;
+  if (mach < 1.0) return 1 - 1.785*(mach - 0.9);
+  return 1.214 - 0.502/(mach*mach) + 0.1095/Math.pow(mach, 4);
+}
+
+/* Nose cone pressure drag, eqs (3.86), (3.87), (B.4), (B.5), (B.6), (B.8) */
+function nosePressureCd(mach, geo) {
+  var se = geo.sinEps;
+  var shape = 0.72*Math.pow(geo.kappa - 0.5, 2) + 0.82;   // (B.8)
+  var cdM0 = 0.8*Math.pow(Math.sin(geo.jointAngle), 2);   // (3.86)
+  var cd1 = shape*se;                                     // (B.6) x shape
+  var d1 = shape*(4/(1.4 + 1))*(1 - 0.5*se);              // (B.5) x shape
+
+  if (mach < 1) {                                         // (3.87)
+    if (cd1 - cdM0 <= 0.01 || d1 <= 0.01) return cdM0;
+    var b = d1/(cd1 - cdM0);                              // fit at M = 1
+    var a = cd1 - cdM0;
+    return a*Math.pow(mach, b) + cdM0;
+  }
+  if (mach < 1.3) {   // cubic Hermite bridge, matched value+slope at 1 and 1.3
+    var cd13 = shape*(2.1*se*se + 0.6019*se);             // (B.4) at M=1.3
+    var d13 = shape*(-1.1341*se);                         // d(B.4)/dM at 1.3
+    var t = (mach - 1)/0.3, t2 = t*t, t3 = t2*t;
+    return (2*t3 - 3*t2 + 1)*cd1 + 0.3*(t3 - 2*t2 + t)*d1
+         + (-2*t3 + 3*t2)*cd13 + 0.3*(t3 - t2)*d13;
+  }
+  return shape*(2.1*se*se + 0.5*se/Math.sqrt(mach*mach - 1));  // (B.4)
+}
+
+/* Axial drag scaling with angle of attack, section 3.4.7:
+   "starts from 1 at alpha = 0, increases to 1.3 at alpha = 17 deg and then
+    decreases to zero at alpha = 90 deg; the derivative is also zero at
+    these points" - implemented as the two Hermite segments that satisfy it. */
+function axialDragAoaFactor(alphaRad) {
+  var a = Math.abs(alphaRad), a17 = 17*Math.PI/180, a90 = Math.PI/2;
+  if (a >= a90) return 0;
+  if (a <= a17) {
+    var t = a/a17, t2 = t*t, t3 = t2*t;
+    return 1 + (1.3 - 1)*(-2*t3 + 3*t2);
+  }
+  var u = (a - a17)/(a90 - a17), u2 = u*u, u3 = u2*u;
+  return 1.3*(2*u3 - 3*u2 + 1);
+}
+
+/* Total zero-angle axial drag coefficient, eqs (3.85) and (3.97).
+   thrusting: the exhaust fills the base, so the thrusting nozzle exit area
+   is removed from the base reference area (section 3.4.5). */
+function dragBuildup(mach, Re, geo, V, thrusting, aExit) {
+  var rsOverL = Math.max((V.surfaceRoughness || 20e-6)/geo.lRef, 1e-9);
+  var cfc = skinFrictionCf(Re, rsOverL, mach);
+  var t = V.finThickness || 0;
+
+  // (3.85) friction, already referenced to sRef
+  var cdFriction = cfc*((1 + 1/(2*geo.fB))*geo.aWetBody
+                      + (1 + 2*t/geo.cBar)*geo.aWetFins) / geo.sRef;
+
+  // (3.94) base drag, referenced to the base area
+  var aBase = geo.sRef - (thrusting ? Math.min(aExit, geo.sRef) : 0);
+  var cdBase = baseCd(mach)*aBase/geo.sRef;
+
+  // nose pressure drag: nose base area == body reference area
+  var cdNose = nosePressureCd(mach, geo);
+
+  // (3.89)-(3.93) fin pressure drag, referenced to the fin frontal area
+  var cdLE = finLeadingEdgeCd(mach)*Math.pow(Math.cos(geo.gammaLE), 2);
+  var profile = V.finProfile || 'rounded';
+  var cdTE = (profile === 'square') ? baseCd(mach)
+           : (profile === 'airfoil') ? 0 : 0.5*baseCd(mach);
+  var cdFins = (cdLE + cdTE)*geo.aFinFrontal/geo.sRef;
+
+  return { cd: cdFriction + cdBase + cdNose + cdFins,
+           friction:cdFriction, base:cdBase, nose:cdNose, fins:cdFins,
+           cf:cfc };
+}
+
+/* Normal force slope and centre of pressure (Barrowman). The axial force
+   coefficient is no longer a tabulated guess - see dragBuildup(). */
+function aeroCoefficients(mach, geo, V, Re, thrusting, aExit, alpha) {
+  var cNs = (V && V.cNaScale !== undefined) ? V.cNaScale : 1;
+  var dCp = (V && V.xCpShift !== undefined) ? V.xCpShift : 0;
+  var cAs = (V && V.cAscale !== undefined) ? V.cAscale : 1;
+
+  var beta = (mach < 1) ? Math.sqrt(Math.max(1 - mach*mach, 0.25))
+                        : Math.sqrt(Math.max(mach*mach - 1, 0.25));
+  var cNaFins = geo.cNaFins0 / beta * cNs;
+  var cNaNose = geo.cNaNose * cNs;
+  var cNa = cNaNose + cNaFins;
+  var xCp = (cNaNose*geo.xCpNose + cNaFins*geo.xCpFins) / cNa + dCp;
+
+  var cA = 0, parts = null;
+  if (Re !== undefined) {
+    parts = dragBuildup(mach, Re, geo, V, thrusting, aExit || 0);
+    cA = parts.cd * cAs * axialDragAoaFactor(alpha || 0);
+  }
+  return { cNa:cNa, xCp:xCp, cA:cA, cdParts:parts,
+           cNaComp:[cNaNose, cNaFins],
+           xComp:[geo.xCpNose + dCp, geo.xCpFins + dCp],
+           rollArm1:geo.rollArm1, rollArm2:geo.rollArm2 };
+}
+
+/* massProperties.m
+   The propellant in each tank is a right circular cylinder of liquid of the
+   tank's inner radius, settled against the aft bulkhead by the axial
+   acceleration. Its length follows from the remaining mass and density, so
+   the mass, CG and inertia are exact for that geometry - no shape factors.
+       L_fill = m / (rho * pi * R^2)
+       x_cg   = x_aft - L_fill/2                (stations +aft from the nose)
+       I_axial     = m R^2 / 2
+       I_transverse= m (3 R^2 + L_fill^2) / 12  (about its own CG)
+   Parallel-axis terms then move everything to the vehicle CG. */
+function tankColumn(mass, rho, radius, xAft, lTank) {
+  if (mass <= 0 || radius <= 0) return { m:0, xCg:xAft, len:0 };
+  var len = mass/(rho*Math.PI*radius*radius);
+  if (lTank > 0 && len > lTank) len = lTank;   // overfull: clamp, flag upstream
+  return { m:mass, xCg:xAft - len/2, len:len };
+}
+
+function massProperties(mFuel, mOx, V, P) {
+  mFuel = Math.max(mFuel, 0); mOx = Math.max(mOx, 0);
+  var rhoF = (P && P.rhoFuel) || 789, rhoO = (P && P.rhoOx) || 745;
+  var rF = V.rTankFuel, rO = V.rTankOx;
+
+  var colF = tankColumn(mFuel, rhoF, rF, V.xTankFuelAft, V.lTankFuel);
+  var colO = tankColumn(mOx,  rhoO, rO, V.xTankOxAft,  V.lTankOx);
+
+  var m = V.mDry + colF.m + colO.m;
+  var xCg = (V.mDry*V.xCgDry + colO.m*colO.xCg + colF.m*colF.xCg)/m;
+
+  var iXx = V.iXxDry + 0.5*colF.m*rF*rF + 0.5*colO.m*rO*rO;
+  var iYy = V.iYyDry + V.mDry*Math.pow(xCg - V.xCgDry, 2)
+    + colO.m*((3*rO*rO + colO.len*colO.len)/12 + Math.pow(colO.xCg - xCg, 2))
+    + colF.m*((3*rF*rF + colF.len*colF.len)/12 + Math.pow(colF.xCg - xCg, 2));
+
+  return { m:m, xCg:xCg, iXx:iXx, iYy:iYy,
+           xCgOx:colO.xCg, xCgFuel:colF.xCg,
+           lenOx:colO.len, lenFuel:colF.len };
+}
+
+/* quatToDcm.m - body -> inertial, q = [w x y z] */
+function quatToDcm(q) {
+  var w = q[0], x = q[1], y = q[2], z = q[3];
+  return [
+    [1-2*(y*y+z*z),   2*(x*y-w*z),   2*(x*z+w*y)],
+    [  2*(x*y+w*z), 1-2*(x*x+z*z),   2*(y*z-w*x)],
+    [  2*(x*z-w*y),   2*(y*z+w*x), 1-2*(x*x+y*y)]
+  ];
+}
+
+function railQuaternion(elevation, azimuth) {
+  var u = [Math.cos(elevation)*Math.sin(azimuth),
+           Math.cos(elevation)*Math.cos(azimuth),
+           Math.sin(elevation)];
+  var ax = [0*u[2] - 0*u[1], 0*u[0] - 1*u[2], 1*u[1] - 0*u[0]]; // x_hat X u
+  var s = Math.hypot(ax[0], ax[1], ax[2]);
+  var c = u[0];
+  if (s < 1e-12) return (c > 0) ? [1,0,0,0] : [0,0,0,1];
+  var ang = Math.atan2(s, c), sh = Math.sin(ang/2);
+  return [Math.cos(ang/2), ax[0]/s*sh, ax[1]/s*sh, ax[2]/s*sh];
+}
+
+/* ---------------- flightDynamics.m ---------------- */
+function makeModel(P, V) {
+  var geo = aeroGeometry(V);
+  var sRef = Math.PI/4 * V.dBody*V.dBody;
+  var uRail = [Math.cos(V.railElevation)*Math.sin(V.railAzimuth),
+               Math.cos(V.railElevation)*Math.cos(V.railAzimuth),
+               Math.sin(V.railElevation)];
+
+  function rhs(t, y, wantOut) {
+    var pos = [y[4], y[5], y[6]];
+    var vel = [y[7], y[8], y[9]];
+    var qRaw = [y[10], y[11], y[12], y[13]];
+    var w = [y[14], y[15], y[16]];
+
+    var qn = Math.hypot(qRaw[0], qRaw[1], qRaw[2], qRaw[3]);
+    var q = [qRaw[0]/qn, qRaw[1]/qn, qRaw[2]/qn, qRaw[3]/qn];
+
+    var h = pos[2] + V.hLaunch;
+    var atm = atmosphereISA(h);
+
+    /* engine, with local back-pressure */
+    var yEng = y;
+    if (P.qsChamber) {
+      yEng = [y[0], y[1], chamberQuasiSteady(y[0], y[1], y[3], P), y[3]];
+    }
+    var eng = engineDynamics(yEng, P, Math.max(atm.p, 1.0));
+    if (P.qsChamber) eng.d[2] = 0;   // chamber is algebraic, not integrated
+    var thrust = Math.max(eng.thrust, 0);
+    if (eng.pChamber < P.pChamberMin) thrust = 0;
+    var mDot = eng.mDot;
+
+    var mp = massProperties(y[0], y[1], V, P);
+    var rot = quatToDcm(q);
+    var xBody = [rot[0][0], rot[1][0], rot[2][0]];
+
+    var windFac = Math.pow(Math.max(h - V.hLaunch, 0.1)/V.windRefAlt,
+                           V.windAlphaExp);
+    var wf = Math.min(windFac, 3.0);
+    var vRel = [vel[0] - V.windE*wf, vel[1] - V.windN*wf, vel[2]];
+    var vMag = Math.hypot(vRel[0], vRel[1], vRel[2]);
+    // body components of vRel = rot' * vRel
+    var vRelB = [
+      rot[0][0]*vRel[0] + rot[1][0]*vRel[1] + rot[2][0]*vRel[2],
+      rot[0][1]*vRel[0] + rot[1][1]*vRel[1] + rot[2][1]*vRel[2],
+      rot[0][2]*vRel[0] + rot[1][2]*vRel[1] + rot[2][2]*vRel[2]
+    ];
+    var mach = vMag / atm.a;
+    var Re = vMag * geo.lRef / atm.nu;          // Reynolds number, eq (3.x)
+
+    var qBar = 0.5 * atm.rho * vMag*vMag;
+    var fB = [0,0,0], mB = [0,0,0], alpha = 0;
+
+    // angle of attack first, since the axial drag is scaled by it (3.4.7)
+    var vLatPre = Math.hypot(vRelB[1], vRelB[2]);
+    if (vMag > 0.5) alpha = Math.atan2(vLatPre, vRelB[0]);
+    var aero = aeroCoefficients(mach, geo, V, Re, thrust > 0,
+                                P.aExit, alpha);
+
+    if (vMag > 0.5) {
+      var vLat = vLatPre;
+      fB[0] = -Math.sign(vRelB[0]) * qBar * sRef * aero.cA;
+      if (vLat > 1e-9) {
+        var kN = qBar * sRef * aero.cNa * Math.sin(alpha) / vLat;
+        fB[1] -= kN * vRelB[1];
+        fB[2] -= kN * vRelB[2];
+      }
+      // rCp = [xCg - xCp, 0, 0];  m = rCp x fB
+      var rx = mp.xCg - aero.xCp;
+      mB = [0, -rx*fB[2], rx*fB[1]];
+
+      var cDampSum = aero.cNaComp[0]*Math.pow(aero.xComp[0]-mp.xCg, 2)
+                   + aero.cNaComp[1]*Math.pow(aero.xComp[1]-mp.xCg, 2);
+      var mDampAero = 0.5 * atm.rho * vMag * sRef * cDampSum;
+      mB[1] -= mDampAero * w[1];
+      mB[2] -= mDampAero * w[2];
+      // fin roll damping, strip theory (see aeroCoefficients.m)
+      mB[0] -= 0.5*atm.rho*vMag*sRef*aero.cNaComp[1]*aero.rollArm2
+             * V.cRollDamp * w[0];
+      // fin cant -> roll driving moment
+      if (V.finCant) {
+        mB[0] += qBar*sRef*aero.cNaComp[1]*Math.sin(V.finCant)*aero.rollArm1;
+      }
+    }
+
+    var mDampJet = mDot * Math.pow(V.xNozzleExit - mp.xCg, 2);
+    mB[1] -= mDampJet * w[1];
+    mB[2] -= mDampJet * w[2];
+
+    /* thrust vector with misalignment (cant + lateral CG offset) */
+    var cant = V.thrustCant || 0, clock = V.thrustClock || 0;
+    var cgY = V.cgOffsetY || 0, cgZ = V.cgOffsetZ || 0;
+    var fTB;
+    if (cant === 0) { fTB = [thrust, 0, 0]; }
+    else {
+      var sc = Math.sin(cant);
+      fTB = [thrust*Math.cos(cant), thrust*sc*Math.cos(clock),
+             thrust*sc*Math.sin(clock)];
+    }
+    if (cant !== 0 || cgY !== 0 || cgZ !== 0) {
+      var rT = [mp.xCg - V.xNozzleExit, -cgY, -cgZ];
+      mB[0] += rT[1]*fTB[2] - rT[2]*fTB[1];
+      mB[1] += rT[2]*fTB[0] - rT[0]*fTB[2];
+      mB[2] += rT[0]*fTB[1] - rT[1]*fTB[0];
+    }
+
+    var gLocal = G0 * Math.pow(R_EARTH/(R_EARTH + h), 2);
+    // inertial forces = rot * (body vectors)
+    var fAeroI = [
+      rot[0][0]*fB[0] + rot[0][1]*fB[1] + rot[0][2]*fB[2],
+      rot[1][0]*fB[0] + rot[1][1]*fB[1] + rot[1][2]*fB[2],
+      rot[2][0]*fB[0] + rot[2][1]*fB[1] + rot[2][2]*fB[2]
+    ];
+    var fThrI = [
+      rot[0][0]*fTB[0] + rot[0][1]*fTB[1] + rot[0][2]*fTB[2],
+      rot[1][0]*fTB[0] + rot[1][1]*fTB[1] + rot[1][2]*fTB[2],
+      rot[2][0]*fTB[0] + rot[2][1]*fTB[1] + rot[2][2]*fTB[2]
+    ];
+    var acc = [
+      (fThrI[0] + fAeroI[0]) / mp.m,
+      (fThrI[1] + fAeroI[1]) / mp.m,
+      (fThrI[2] + fAeroI[2]) / mp.m - gLocal
+    ];
+
+    // Euler: I*wDot = M - w x (I*w),  I = diag(iXx, iYy, iYy)
+    var Iw = [mp.iXx*w[0], mp.iYy*w[1], mp.iYy*w[2]];
+    var wxIw = [w[1]*Iw[2] - w[2]*Iw[1],
+                w[2]*Iw[0] - w[0]*Iw[2],
+                w[0]*Iw[1] - w[1]*Iw[0]];
+    var wDot = [(mB[0]-wxIw[0])/mp.iXx,
+                (mB[1]-wxIw[1])/mp.iYy,
+                (mB[2]-wxIw[2])/mp.iYy];
+
+    // qDot = 0.5 * qRaw (x) [0;w] + (1 - |q|^2) qRaw
+    var qw = qRaw[0], qx = qRaw[1], qy = qRaw[2], qz = qRaw[3];
+    var k = 1 - (qw*qw + qx*qx + qy*qy + qz*qz);
+    var qDot = [
+      0.5*(-(qx*w[0] + qy*w[1] + qz*w[2])) + k*qw,
+      0.5*( qw*w[0] + (qy*w[2] - qz*w[1]) ) + k*qx,
+      0.5*( qw*w[1] + (qz*w[0] - qx*w[2]) ) + k*qy,
+      0.5*( qw*w[2] + (qx*w[1] - qy*w[0]) ) + k*qz
+    ];
+
+    /* launch rail constraint */
+    var railDist = pos[0]*uRail[0] + pos[1]*uRail[1] + pos[2]*uRail[2];
+    var velRail = vel[0]*uRail[0] + vel[1]*uRail[1] + vel[2]*uRail[2];
+    var onRail = (railDist < V.railLength) && (velRail >= -1e-6)
+              && (Math.hypot(pos[0],pos[1],pos[2]) < V.railLength + 1.0);
+    if (onRail) {
+      var aAxial = acc[0]*uRail[0] + acc[1]*uRail[1] + acc[2]*uRail[2];
+      if (railDist <= 1e-6 && aAxial < 0) aAxial = 0;
+      acc = [aAxial*uRail[0], aAxial*uRail[1], aAxial*uRail[2]];
+      wDot = [0,0,0];
+      qDot = [0,0,0,0];
+    }
+
+    var d = [eng.d[0], eng.d[1], eng.d[2], eng.d[3],
+             vel[0], vel[1], vel[2],
+             acc[0], acc[1], acc[2],
+             qDot[0], qDot[1], qDot[2], qDot[3],
+             wDot[0], wDot[1], wDot[2]];
+
+    if (!wantOut) return d;
+    return { d:d, out:{
+      thrust:thrust, mDot:mDot, isp:eng.isp,
+      pChamber:eng.pChamber, pTank:eng.pTank, tChamber:eng.tChamber,
+      m:mp.m, xCg:mp.xCg, xCp:aero.xCp,
+      margin:(aero.xCp - mp.xCg)/V.dBody,
+      mach:mach, alpha:alpha, qBar:qBar, vMag:vMag,
+      cA:aero.cA, cdParts:aero.cdParts, reynolds:Re,
+      accMag:Math.hypot(acc[0],acc[1],acc[2]),
+      onRail:onRail, xBody:xBody, rho:atm.rho, pAtm:atm.p
+    }};
+  }
+
+  return { rhs:rhs, uRail:uRail, geo:geo, sRef:sRef };
+}
+
+/* ---------------- Dormand-Prince RK45 (ode45) ---------------- */
+var DP_A = [
+  [],
+  [1/5],
+  [3/40, 9/40],
+  [44/45, -56/15, 32/9],
+  [19372/6561, -25360/2187, 64448/6561, -212/729],
+  [9017/3168, -355/33, 46732/5247, 49/176, -5103/18656],
+  [35/384, 0, 500/1113, 125/192, -2187/6784, 11/84]
+];
+var DP_C  = [0, 1/5, 3/10, 4/5, 8/9, 1, 1];
+var DP_B5 = [35/384, 0, 500/1113, 125/192, -2187/6784, 11/84, 0];
+var DP_B4 = [5179/57600, 0, 7571/16695, 393/640, -92097/339200, 187/2100, 1/40];
+
+function hermite(theta, h, y0, y1, f0, f1, i) {
+  var t2 = theta*theta, t3 = t2*theta;
+  var h00 = 2*t3 - 3*t2 + 1, h10 = t3 - 2*t2 + theta;
+  var h01 = -2*t3 + 3*t2,    h11 = t3 - t2;
+  return h00*y0[i] + h*h10*f0[i] + h01*y1[i] + h*h11*f1[i];
+}
+
+function integrate(rhs, tSpan, y0, opts) {
+  var n = y0.length;
+  var rtol = opts.rtol, atol = opts.atol;
+  var maxStep = opts.maxStep, maxSteps = opts.maxSteps || 400000;
+  var events = opts.events || [];
+
+  var t = tSpan[0], tEnd = tSpan[1];
+  var y = y0.slice();
+  var f0 = rhs(t, y);
+  var h = Math.min(opts.initialStep || 1e-3, maxStep);
+
+  var T = [t], Y = [y.slice()];
+  var evtHits = events.map(function () { return []; });
+  var prevG = events.map(function (e) { return e.g(t, y); });
+  var terminated = false, steps = 0, rejected = 0;
+  var k = new Array(7);
+
+  while (t < tEnd && steps < maxSteps && !terminated) {
+    if (t + h > tEnd) h = tEnd - t;
+    k[0] = f0;
+    var ytmp = new Array(n);
+    for (var s = 1; s < 7; s++) {
+      for (var i = 0; i < n; i++) {
+        var acc = 0;
+        for (var j = 0; j < s; j++) {
+          var aij = DP_A[s][j];
+          if (aij !== 0) acc += aij * k[j][i];
+        }
+        ytmp[i] = y[i] + h*acc;
+      }
+      k[s] = rhs(t + DP_C[s]*h, ytmp);
+    }
+
+    var y5 = new Array(n), err = 0;
+    for (var i2 = 0; i2 < n; i2++) {
+      var s5 = 0, s4 = 0;
+      for (var j2 = 0; j2 < 7; j2++) {
+        if (DP_B5[j2] !== 0) s5 += DP_B5[j2]*k[j2][i2];
+        if (DP_B4[j2] !== 0) s4 += DP_B4[j2]*k[j2][i2];
+      }
+      y5[i2] = y[i2] + h*s5;
+      var e = h*(s5 - s4);
+      var sc = atol[i2] + rtol*Math.max(Math.abs(y[i2]), Math.abs(y5[i2]));
+      var r = e/sc; err += r*r;
+    }
+    err = Math.sqrt(err/n);
+
+    if (err <= 1) {
+      var tNew = t + h;
+      var f1 = k[6];                                   // FSAL
+      var tAccept = tNew, yAccept = y5;
+
+      // event detection on [t, tNew]
+      for (var ei = 0; ei < events.length; ei++) {
+        var ev = events[ei];
+        var gNew = ev.g(tNew, y5);
+        var gOld = prevG[ei];
+        var cross = (gOld > 0 && gNew <= 0 && ev.dir <= 0) ||
+                    (gOld < 0 && gNew >= 0 && ev.dir >= 0);
+        if (cross && h > 0) {
+          // bisect on the Hermite interpolant
+          var lo = 0, hi = 1, gl = gOld;
+          var yi = new Array(n);
+          for (var it = 0; it < 60; it++) {
+            var mid = 0.5*(lo + hi);
+            for (var q2 = 0; q2 < n; q2++)
+              yi[q2] = hermite(mid, h, y, y5, f0, f1, q2);
+            var gm = ev.g(t + mid*h, yi);
+            if (gl*gm <= 0) { hi = mid; } else { lo = mid; gl = gm; }
+          }
+          var th = 0.5*(lo + hi);
+          var yEvt = new Array(n);
+          for (var q3 = 0; q3 < n; q3++)
+            yEvt[q3] = hermite(th, h, y, y5, f0, f1, q3);
+          evtHits[ei].push({ t: t + th*h, y: yEvt });
+          if (ev.terminal) {
+            tAccept = t + th*h; yAccept = yEvt; terminated = true;
+          }
+        }
+        prevG[ei] = ev.g(tAccept, yAccept);
+      }
+
+      t = tAccept; y = yAccept;
+      T.push(t); Y.push(y.slice());
+      f0 = terminated ? rhs(t, y) : f1;
+      var fac = 0.9 * Math.pow(err > 1e-10 ? err : 1e-10, -0.2);
+      h = Math.min(maxStep, h * Math.min(5, Math.max(0.2, fac)));
+      steps++;
+    } else {
+      rejected++;
+      h = h * Math.min(1, Math.max(0.1, 0.9*Math.pow(err, -0.2)));
+      if (!isFinite(h) || h < 1e-12) break;
+    }
+  }
+  return { t:T, y:Y, events:evtHits, steps:steps, rejected:rejected,
+           terminated:terminated };
+}
+
+/* ---------------- top-level run ---------------- */
+function runFlight(P, V) {
+  var model = makeModel(P, V);
+  var rhsFn = function (t, y) { return model.rhs(t, y, false); };
+
+  var q0 = railQuaternion(V.railElevation, V.railAzimuth);
+  var y0 = [P.mFuel0, P.mOx0, P.pChamber0, P.pTank0,
+            0,0,0, 0,0,0,
+            q0[0], q0[1], q0[2], q0[3],
+            0,0,0];
+
+  var atol = [1e-5, 1e-5, 1e2, 1e2,
+              1e-3,1e-3,1e-3, 1e-4,1e-4,1e-4,
+              1e-8,1e-8,1e-8,1e-8, 1e-6,1e-6,1e-6];
+
+  var events = [
+    { g:function (t,y) { return y[6] + 0.5; }, dir:-1, terminal:true },
+    { g:function (t,y) { return y[9]; },       dir:-1, terminal:false }
+  ];
+
+  var t0 = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  var sol = integrate(rhsFn, [0, V.tEndFlight], y0, {
+    rtol: V.relTol, atol: atol, maxStep: 0.25, initialStep: 1e-3,
+    events: events
+  });
+  var wall = ((typeof performance !== 'undefined') ? performance.now()
+                                                   : Date.now()) - t0;
+
+  /* derived time histories */
+  var N = sol.t.length;
+  var H = {
+    t: sol.t,
+    posE: new Float64Array(N), posN: new Float64Array(N), alt: new Float64Array(N),
+    velE: new Float64Array(N), velN: new Float64Array(N), velU: new Float64Array(N),
+    thrust: new Float64Array(N), mass: new Float64Array(N),
+    mach: new Float64Array(N), vMag: new Float64Array(N),
+    alpha: new Float64Array(N), margin: new Float64Array(N),
+    qBar: new Float64Array(N), accG: new Float64Array(N),
+    tilt: new Float64Array(N), p: new Float64Array(N),
+    q: new Float64Array(N), r: new Float64Array(N),
+    pChamber: new Float64Array(N), pTank: new Float64Array(N),
+    isp: new Float64Array(N), mDot: new Float64Array(N),
+    xCg: new Float64Array(N), xCp: new Float64Array(N),
+    downrange: new Float64Array(N), qNormErr: new Float64Array(N),
+    onRail: new Uint8Array(N)
+  };
+
+  for (var i = 0; i < N; i++) {
+    var yi = sol.y[i];
+    var res = model.rhs(sol.t[i], yi, true).out;
+    H.posE[i] = yi[4]; H.posN[i] = yi[5]; H.alt[i] = yi[6];
+    H.velE[i] = yi[7]; H.velN[i] = yi[8]; H.velU[i] = yi[9];
+    H.p[i] = yi[14]*180/Math.PI;
+    H.q[i] = yi[15]*180/Math.PI;
+    H.r[i] = yi[16]*180/Math.PI;
+    H.thrust[i] = res.thrust; H.mass[i] = res.m;
+    H.mach[i] = res.mach; H.vMag[i] = res.vMag;
+    H.alpha[i] = res.alpha*180/Math.PI;
+    H.margin[i] = res.margin; H.qBar[i] = res.qBar;
+    H.accG[i] = res.accMag/G0;
+    H.pChamber[i] = res.pChamber; H.pTank[i] = res.pTank;
+    H.isp[i] = res.isp; H.mDot[i] = res.mDot;
+    H.xCg[i] = res.xCg; H.xCp[i] = res.xCp;
+    H.onRail[i] = res.onRail ? 1 : 0;
+    H.downrange[i] = Math.hypot(yi[4], yi[5]);
+    H.tilt[i] = Math.acos(Math.max(-1, Math.min(1, res.xBody[2])))*180/Math.PI;
+    H.qNormErr[i] = Math.abs(Math.hypot(yi[10],yi[11],yi[12],yi[13]) - 1);
+  }
+
+  /* key events */
+  var uR = model.uRail;
+  var iRail = -1, iBurn = -1, iApo = 0;
+  for (var a = 0; a < N; a++) {
+    var rd = H.posE[a]*uR[0] + H.posN[a]*uR[1] + H.alt[a]*uR[2];
+    if (iRail < 0 && rd >= V.railLength) iRail = a;
+    if (H.thrust[a] > 1.0) iBurn = a;
+    if (H.alt[a] > H.alt[iApo]) iApo = a;
+  }
+  if (iBurn < 0) iBurn = 0;
+  if (iRail < 0) iRail = 0;
+
+  function maxOf(arr, lo, hi) {
+    var m = -Infinity;
+    for (var i = (lo||0); i < (hi === undefined ? arr.length : hi); i++)
+      if (arr[i] > m) m = arr[i];
+    return m;
+  }
+  function minOf(arr, lo, hi) {
+    var m = Infinity;
+    for (var i = (lo||0); i < (hi === undefined ? arr.length : hi); i++)
+      if (arr[i] < m) m = arr[i];
+    return m;
+  }
+
+  var totalImpulse = 0;
+  for (var b = 1; b < N; b++)
+    totalImpulse += 0.5*(H.thrust[b] + H.thrust[b-1])*(H.t[b] - H.t[b-1]);
+
+  var comb = combustionSolver(P.ofRatio);
+  var mp0 = massProperties(P.mFuel0, P.mOx0, V, P);
+  // subsonic reference condition for the quoted CP / margin: M = 0.3 at the
+  // pad, Reynolds number from the standard atmosphere there
+  var atm0 = atmosphereISA(V.hLaunch);
+  var aero0 = aeroCoefficients(0.3, model.geo, V,
+                               0.3*atm0.a*model.geo.lRef/atm0.nu,
+                               true, P.aExit, 0);
+
+  var landed = sol.events[0].length > 0;
+  var landPos = landed ? sol.events[0][0].y : sol.y[N-1];
+
+  var summary = {
+    wallMs: wall, steps: sol.steps, rejected: sol.rejected, nPoints: N,
+    tChamber: comb.tChamber, gamma: comb.gamma, mwMix: comb.mwMix,
+    ofStoich: comb.ofStoich,
+    massLiftoff: mp0.m, xCgWet: mp0.xCg, xCpSub: aero0.xCp,
+    marginWet: (aero0.xCp - mp0.xCg)/V.dBody,
+    thrust0: H.thrust[0], twRatio: H.thrust[0]/(mp0.m*G0),
+    tRail: H.t[iRail], vRail: H.vMag[iRail],
+    tBurn: H.t[iBurn], altBurn: H.alt[iBurn], vBurn: H.vMag[iBurn],
+    apogee: H.alt[iApo], tApogee: H.t[iApo],
+    vMax: maxOf(H.vMag), machMax: maxOf(H.mach),
+    qBarMax: maxOf(H.qBar), accMax: maxOf(H.accG),
+    alphaMaxBoost: (iBurn > iRail) ? maxOf(H.alpha, iRail, iBurn) : 0,
+    marginMinBoost: minOf(H.margin, 0, Math.max(iBurn,1)),
+    tiltBurn: H.tilt[iBurn],
+    totalImpulse: totalImpulse,
+    ispMean: (function () {
+      var s = 0, c = 0;
+      for (var i = 0; i <= iBurn; i++) { if (H.isp[i] > 0) { s += H.isp[i]; c++; } }
+      return c ? s/c : 0;
+    })(),
+    propUsed: (P.mFuel0 + P.mOx0) - (sol.y[iBurn][0] + sol.y[iBurn][1]),
+    qDrift: maxOf(H.qNormErr),
+    landed: landed,
+    tLand: landed ? sol.events[0][0].t : H.t[N-1],
+    rangeLand: Math.hypot(landPos[4], landPos[5]),
+    iRail: iRail, iBurn: iBurn, iApogee: iApo
+  };
+
+  return { H:H, summary:summary, raw:sol };
+}
+
+/* ==================================================================
+   MONTE CARLO DISPERSIONS
+   Each dispersed quantity is drawn from a Gaussian truncated at +/-3
+   sigma, except wind direction, which is uniform over 0-360 deg.
+   ================================================================== */
+
+/* Deterministic RNG (mulberry32) so a seed reproduces a run exactly */
+function makeRng(seed) {
+  var a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/* Box-Muller with +/-3 sigma truncation */
+function randn(rng) {
+  for (var i = 0; i < 20; i++) {
+    var u = rng(), v = rng();
+    if (u < 1e-12) u = 1e-12;
+    var z = Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+    if (Math.abs(z) <= 3) return z;
+  }
+  return 0;
+}
+
+/* Dispersion specification.
+   kind 'pct' : sigma is a percentage of the nominal value
+   kind 'abs' : sigma is in the parameter's own SI unit
+   target 'P' engine params, 'V' vehicle params                        */
+var DISP_SPEC = [
+  // key            target label                       kind   default sigma
+  ['kInj',          'P', 'Injector coefficient',       'pct', 2.0],
+  ['ofRatio',       'P', 'O/F ratio',                  'pct', 2.0],
+  ['mFuel0',        'P', 'Ethanol load',               'pct', 1.0],
+  ['mOx0',          'P', 'N2O load',                   'pct', 1.5],
+  ['pTank0',        'P', 'Initial tank pressure',      'pct', 2.0],
+  ['aThroat',       'P', 'Throat area (erosion)',      'pct', 1.5],
+  ['cAscale',       'V', 'Drag coefficient',           'pct', 10.0],
+  ['cNaScale',      'V', 'Normal-force slope',         'pct', 5.0],
+  ['xCpShift',      'V', 'CP shift',                   'abs', 0.030],
+  ['mDry',          'V', 'Dry mass',                   'pct', 2.0],
+  ['xCgDry',        'V', 'Dry CG station',             'abs', 0.020],
+  ['iYyDry',        'V', 'Pitch inertia',              'pct', 5.0],
+  ['windMag',       'V', 'Wind speed',                 'abs', 2.0],
+  ['railElevation', 'V', 'Rail elevation',             'abs', 0.5],
+  ['railAzimuth',   'V', 'Rail azimuth',               'abs', 1.0],
+  ['thrustCant',    'V', 'Thrust misalignment',        'abs', 0.15],
+  ['cgOffsetY',     'V', 'Lateral CG offset',          'abs', 0.002],
+  ['finCant',       'V', 'Fin cant',                   'abs', 0.10]
+];
+
+function defaultSigmas() {
+  var s = {};
+  DISP_SPEC.forEach(function (d) { s[d[0]] = d[4]; });
+  return s;
+}
+
+/* Draw one sample. Returns the perturbed (P, V) plus the normalised
+   draw vector z used later for the sensitivity ranking. */
+function drawCase(P0, V0, sig, rng) {
+  var P = {}, V = {}, z = {};
+  Object.keys(P0).forEach(function (k) { P[k] = P0[k]; });
+  Object.keys(V0).forEach(function (k) { V[k] = V0[k]; });
+
+  function pct(key, obj, field) {
+    var s = sig[key] || 0; if (s === 0) { z[key] = 0; return; }
+    var g = randn(rng); z[key] = g;
+    obj[field] *= (1 + g*s/100);
+  }
+  function abs(key, obj, field, scale) {
+    var s = sig[key] || 0; if (s === 0) { z[key] = 0; return; }
+    var g = randn(rng); z[key] = g;
+    obj[field] += g*s*(scale === undefined ? 1 : scale);
+  }
+
+  pct('kInj', P, 'kInj');
+  pct('ofRatio', P, 'ofRatio');
+  pct('mFuel0', P, 'mFuel0');
+  pct('mOx0', P, 'mOx0');
+  pct('pTank0', P, 'pTank0');
+  pct('aThroat', P, 'aThroat');
+  if (V.cAscale === undefined) V.cAscale = 1;
+  pct('cAscale', V, 'cAscale');
+
+  // aero slope scale and CP shift are applied inside aeroCoefficients
+  if (V.cNaScale === undefined) V.cNaScale = 1;
+  pct('cNaScale', V, 'cNaScale');
+  if (V.xCpShift === undefined) V.xCpShift = 0;
+  abs('xCpShift', V, 'xCpShift');
+
+  pct('mDry', V, 'mDry');
+  abs('xCgDry', V, 'xCgDry');
+  pct('iYyDry', V, 'iYyDry');
+
+  // wind: magnitude perturbed about nominal, direction uniform 0-360
+  var w0 = Math.hypot(V0.windE, V0.windN);
+  var sW = sig.windMag || 0;
+  var wMag = w0, zW = 0;
+  if (sW > 0) { zW = randn(rng); wMag = Math.max(0, w0 + zW*sW); }
+  z.windMag = zW;
+  var wDir = (sig.windDirUniform === false)
+      ? Math.atan2(V0.windE, V0.windN) : rng()*2*Math.PI;
+  z.windDir = wDir/(2*Math.PI);
+  V.windE = wMag*Math.sin(wDir);
+  V.windN = wMag*Math.cos(wDir);
+
+  abs('railElevation', V, 'railElevation', Math.PI/180);
+  abs('railAzimuth', V, 'railAzimuth', Math.PI/180);
+
+  // thrust misalignment: cant magnitude Gaussian, clock angle uniform
+  var sC = sig.thrustCant || 0;
+  if (sC > 0) {
+    var gC = randn(rng); z.thrustCant = gC;
+    V.thrustCant = Math.abs(gC)*sC*Math.PI/180;
+    V.thrustClock = rng()*2*Math.PI;
+  } else { z.thrustCant = 0; V.thrustCant = 0; V.thrustClock = 0; }
+
+  var sG = sig.cgOffsetY || 0;
+  if (sG > 0) {
+    var gG = randn(rng), ang = rng()*2*Math.PI;
+    z.cgOffsetY = gG;
+    V.cgOffsetY = gG*sG*Math.cos(ang);
+    V.cgOffsetZ = gG*sG*Math.sin(ang);
+  } else { z.cgOffsetY = 0; V.cgOffsetY = 0; V.cgOffsetZ = 0; }
+
+  abs('finCant', V, 'finCant', Math.PI/180);
+
+  return { P:P, V:V, z:z };
+}
+
+/* Pearson correlation */
+function corr(x, y) {
+  var n = x.length, mx = 0, my = 0;
+  for (var i = 0; i < n; i++) { mx += x[i]; my += y[i]; }
+  mx /= n; my /= n;
+  var sxy = 0, sxx = 0, syy = 0;
+  for (var j = 0; j < n; j++) {
+    var dx = x[j] - mx, dy = y[j] - my;
+    sxy += dx*dy; sxx += dx*dx; syy += dy*dy;
+  }
+  if (sxx <= 0 || syy <= 0) return 0;
+  return sxy/Math.sqrt(sxx*syy);
+}
+
+function percentile(sorted, p) {
+  if (!sorted.length) return NaN;
+  var idx = (sorted.length - 1)*p;
+  var lo = Math.floor(idx), hi = Math.ceil(idx);
+  return sorted[lo] + (sorted[hi] - sorted[lo])*(idx - lo);
+}
+
+function statsOf(arr) {
+  var s = arr.slice().sort(function (a, b) { return a - b; });
+  var n = arr.length, mean = 0;
+  for (var i = 0; i < n; i++) mean += arr[i];
+  mean /= n;
+  var v = 0;
+  for (var j = 0; j < n; j++) v += (arr[j] - mean)*(arr[j] - mean);
+  var sd = Math.sqrt(n > 1 ? v/(n - 1) : 0);
+  return { mean:mean, sd:sd, min:s[0], max:s[n-1],
+           p5:percentile(s,0.05), p50:percentile(s,0.50),
+           p95:percentile(s,0.95), lo3:mean - 3*sd, hi3:mean + 3*sd };
+}
+
+/* 2D impact statistics: covariance ellipse + CEP */
+function impactStats(E, N) {
+  var n = E.length, mE = 0, mN = 0;
+  for (var i = 0; i < n; i++) { mE += E[i]; mN += N[i]; }
+  mE /= n; mN /= n;
+  var cee = 0, cnn = 0, cen = 0;
+  for (var j = 0; j < n; j++) {
+    var de = E[j] - mE, dn = N[j] - mN;
+    cee += de*de; cnn += dn*dn; cen += de*dn;
+  }
+  var d = Math.max(n - 1, 1);
+  cee /= d; cnn /= d; cen /= d;
+  // eigen-decomposition of the 2x2 covariance
+  var tr = cee + cnn, det = cee*cnn - cen*cen;
+  var disc = Math.sqrt(Math.max(tr*tr/4 - det, 0));
+  var l1 = tr/2 + disc, l2 = Math.max(tr/2 - disc, 0);
+  var ang = 0.5*Math.atan2(2*cen, cee - cnn);   // from East axis
+  var radii = [];
+  for (var k = 0; k < n; k++)
+    radii.push(Math.hypot(E[k] - mE, N[k] - mN));
+  radii.sort(function (a, b) { return a - b; });
+  return {
+    meanE:mE, meanN:mN,
+    semiMajor:Math.sqrt(l1), semiMinor:Math.sqrt(l2), angle:ang,
+    cep50:percentile(radii, 0.50), cep95:percentile(radii, 0.95),
+    rMax:radii[radii.length - 1]
+  };
+}
+
+/* Run a Monte Carlo campaign.
+   opts: { nRuns, seed, sigmas, qsChamber, relTol, keepTraces, onProgress }
+   Runs in chunks so a browser UI can paint between batches; call
+   repeatedly through the returned stepper, or use runMonteCarlo for a
+   blocking run (node).                                                */
+function makeMonteCarlo(P0, V0, opts) {
+  var nRuns = opts.nRuns || 200;
+  var sig = opts.sigmas || defaultSigmas();
+  var rng = makeRng((opts.seed === undefined ? 12345 : opts.seed) | 0);
+  var keep = opts.keepTraces === undefined ? 60 : opts.keepTraces;
+
+  var Pf = {}, Vf = {};
+  Object.keys(P0).forEach(function (k) { Pf[k] = P0[k]; });
+  Object.keys(V0).forEach(function (k) { Vf[k] = V0[k]; });
+  if (opts.qsChamber !== false) Pf.qsChamber = true;
+  if (opts.relTol) Vf.relTol = opts.relTol;
+
+  var res = {
+    apogee:[], rangeLand:[], impactE:[], impactN:[], machMax:[], qBarMax:[],
+    vRail:[], accMax:[], tApogee:[], tLand:[], marginMin:[], tBurn:[],
+    vMax:[], tiltBurn:[], alphaMax:[], rollMax:[]
+  };
+  var draws = [];         // normalised z vectors, for sensitivity
+  var traces = [];        // a subset of trajectories for the spaghetti plot
+  var i = 0, failures = 0;
+
+  function one() {
+    var c = drawCase(P0, V0, sig, rng);
+    if (opts.qsChamber !== false) c.P.qsChamber = true;
+    if (opts.relTol) c.V.relTol = opts.relTol;
+    var r;
+    try { r = runFlight(c.P, c.V); }
+    catch (e) { failures++; i++; return; }
+    var S = r.summary;
+    if (!isFinite(S.apogee) || !isFinite(S.rangeLand)) { failures++; i++; return; }
+
+    res.apogee.push(S.apogee);
+    res.rangeLand.push(S.rangeLand);
+    var last = r.raw.y[r.raw.y.length - 1];
+    var le = r.raw.events[0].length ? r.raw.events[0][0].y : last;
+    res.impactE.push(le[4]); res.impactN.push(le[5]);
+    res.machMax.push(S.machMax); res.qBarMax.push(S.qBarMax);
+    res.vRail.push(S.vRail); res.accMax.push(S.accMax);
+    res.tApogee.push(S.tApogee); res.tLand.push(S.tLand);
+    res.marginMin.push(S.marginMinBoost); res.tBurn.push(S.tBurn);
+    res.vMax.push(S.vMax); res.tiltBurn.push(S.tiltBurn);
+    res.alphaMax.push(S.alphaMaxBoost);
+    var rmax = 0;
+    for (var k = 0; k < r.H.p.length; k++)
+      if (Math.abs(r.H.p[k]) > rmax) rmax = Math.abs(r.H.p[k]);
+    res.rollMax.push(rmax);
+    draws.push(c.z);
+
+    if (traces.length < keep) {
+      var stride = Math.max(1, Math.ceil(r.H.t.length/220));
+      var tt = [], aa = [], dd = [];
+      for (var m = 0; m < r.H.t.length; m += stride) {
+        tt.push(r.H.t[m]); aa.push(r.H.alt[m]); dd.push(r.H.downrange[m]);
+      }
+      traces.push({ t:tt, alt:aa, dr:dd });
+    }
+    i++;
+  }
+
+  function finish() {
+    var keys = DISP_SPEC.map(function (d) { return d[0]; });
+    var sens = [];
+    keys.forEach(function (k) {
+      if (!sig[k]) return;                       // not dispersed
+      var col = draws.map(function (z) { return z[k] || 0; });
+      var spread = statsOf(col).sd;
+      if (spread < 1e-9) return;
+      sens.push({
+        key: k,
+        label: (DISP_SPEC.filter(function (d) { return d[0] === k; })[0] || [,,k])[2],
+        apogee: corr(col, res.apogee),
+        range: corr(col, res.rangeLand)
+      });
+    });
+    sens.sort(function (a, b) {
+      return Math.abs(b.apogee) + Math.abs(b.range)
+           - Math.abs(a.apogee) - Math.abs(a.range);
+    });
+
+    return {
+      n: res.apogee.length, failures: failures, nRequested: nRuns,
+      raw: res, traces: traces, sens: sens,
+      stats: {
+        apogee: statsOf(res.apogee), rangeLand: statsOf(res.rangeLand),
+        machMax: statsOf(res.machMax), qBarMax: statsOf(res.qBarMax),
+        vRail: statsOf(res.vRail), accMax: statsOf(res.accMax),
+        tApogee: statsOf(res.tApogee), tLand: statsOf(res.tLand),
+        marginMin: statsOf(res.marginMin), tBurn: statsOf(res.tBurn),
+        vMax: statsOf(res.vMax), tiltBurn: statsOf(res.tiltBurn),
+        alphaMax: statsOf(res.alphaMax), rollMax: statsOf(res.rollMax)
+      },
+      impact: impactStats(res.impactE, res.impactN)
+    };
+  }
+
+  return {
+    total: nRuns,
+    done: function () { return i; },
+    /* run up to msBudget worth of cases; returns true when finished */
+    step: function (msBudget) {
+      var t0 = Date.now();
+      while (i < nRuns && (Date.now() - t0) < msBudget) one();
+      return i >= nRuns;
+    },
+    result: finish
+  };
+}
+
+function runMonteCarlo(P0, V0, opts) {
+  var mc = makeMonteCarlo(P0, V0, opts);
+  while (!mc.step(100000)) { /* blocking */ }
+  return mc.result();
+}
+
+var API = {
+  runFlight: runFlight, makeModel: makeModel, integrate: integrate,
+  makeMonteCarlo: makeMonteCarlo, runMonteCarlo: runMonteCarlo,
+  drawCase: drawCase, defaultSigmas: defaultSigmas, DISP_SPEC: DISP_SPEC,
+  statsOf: statsOf, impactStats: impactStats, corr: corr,
+  makeRng: makeRng, randn: randn, chamberQuasiSteady: chamberQuasiSteady,
+  dragBuildup: dragBuildup, skinFrictionCf: skinFrictionCf, baseCd: baseCd,
+  finLeadingEdgeCd: finLeadingEdgeCd, nosePressureCd: nosePressureCd,
+  axialDragAoaFactor: axialDragAoaFactor,
+  combustionSolver: combustionSolver, atmosphereISA: atmosphereISA,
+  aeroCoefficients: aeroCoefficients, aeroGeometry: aeroGeometry,
+  massProperties: massProperties, quatToDcm: quatToDcm,
+  railQuaternion: railQuaternion, engineDynamics: engineDynamics,
+  nozzlePerformance: nozzlePerformance, G0: G0
+};
+
+if (typeof module !== 'undefined' && module.exports) module.exports = API;
+root.RocketPhysics = API;
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+/* ============================ APPLICATION ============================ */
+(function () {
+'use strict';
+var PH = window.RocketPhysics;
+var BYLINE = 'by Alessandro Valente';
+var DEG = Math.PI/180;
+
+/* ---------- parameter specification ----------
+   mul = multiplier from the displayed unit to SI                      */
+var SPEC = [
+ // group     key            label                    unit      target mul     base      step
+ ['grpEngine','aThroat',     'Throat area',           'cm²',    'P', 1e-4,     15,       0.5],
+ ['grpEngine','aExit',       'Exit area',             'cm²',    'P', 1e-4,     120,      5],
+ ['grpEngine','lStar',       'L* (char. length)',     'm',      'P', 1,        1.00,     0.1],
+ ['grpEngine','pChamber0',   'Initial chamber P',     'bar',    'P', 1e5,      20,       1],
+ ['grpEngine','ofRatio',     'O/F (mass)',            '-',      'P', 1,        5.00,     0.1],
+ ['grpEngine','mFuel0',      'Ethanol load',          'kg',     'P', 1,        5.0,      0.5],
+ ['grpEngine','mOx0',        'N₂O load',              'kg',     'P', 1,        25.0,     1],
+ ['grpEngine','pTank0',      'Initial tank P',        'bar',    'P', 1e5,      40,       1],
+ ['grpEngine','vUllage0',    'Initial ullage',        'L',      'P', 1e-3,     10,       1],
+ ['grpEngine','kInj',        'Injector coeff.',       '-',      'P', 1,        1.5e-5,   1e-6],
+ ['grpEngine','pChamberMin', 'Cutoff chamber P',      'bar',    'P', 1e5,      1.20,     0.1],
+ ['grpEngine','rhoFuel',     'Ethanol density',       'kg/m³',  'P', 1,        789,      1],
+ ['grpEngine','rhoOx',       'N₂O density',           'kg/m³',  'P', 1,        745,      1],
+
+ ['grpAirframe','mDry',      'Dry mass',              'kg',     'V', 1,        18.0,     0.5],
+ ['grpAirframe','dBody',     'Body diameter',         'm',      'V', 1,        0.200,    0.005],
+ ['grpAirframe','lTotal',    'Total length',          'm',      'V', 1,        3.60,     0.1],
+ ['grpAirframe','lNose',     'Nose length',           'm',      'V', 1,        0.70,     0.05],
+ ['grpAirframe','noseShape', 'Nose shape',            '',       'V', 'sel',    'ogive',  0],
+ ['grpAirframe','surfaceRoughness','Surface roughness','µm',    'V', 1e-6,     20,       1],
+ ['grpAirframe','cAscale',   'Drag scale factor',     '×',      'V', 1,        1.00,     0.05],
+
+ ['grpMass','xCgDry',        'Dry CG station',        'm',      'V', 1,        2.05,     0.05],
+ ['grpMass','iXxDry',        'Dry roll inertia',      'kg·m²',  'V', 1,        0.180,    0.01],
+ ['grpMass','iYyDry',        'Dry pitch inertia',     'kg·m²',  'V', 1,        19.53,    0.5],
+ ['grpMass','xTankOxAft',    'N₂O tank aft end',      'm',      'V', 1,        2.30,     0.05],
+ ['grpMass','rTankOx',       'N₂O tank inner radius', 'm',      'V', 1,        0.094,    0.002],
+ ['grpMass','lTankOx',       'N₂O tank length',       'm',      'V', 1,        1.60,     0.05],
+ ['grpMass','xTankFuelAft',  'Ethanol tank aft end',  'm',      'V', 1,        2.95,     0.05],
+ ['grpMass','rTankFuel',     'Ethanol tank inner rad','m',      'V', 1,        0.094,    0.002],
+ ['grpMass','lTankFuel',     'Ethanol tank length',   'm',      'V', 1,        0.35,     0.05],
+
+ ['grpFins','nFins',         'Number of fins',        '-',      'V', 1,        4,        1],
+ ['grpFins','finRootChord',  'Root chord',            'm',      'V', 1,        0.300,    0.01],
+ ['grpFins','finTipChord',   'Tip chord',             'm',      'V', 1,        0.120,    0.01],
+ ['grpFins','finSpan',       'Semispan',              'm',      'V', 1,        0.110,    0.005],
+ ['grpFins','finSweep',      'LE sweep',              'm',      'V', 1,        0.120,    0.01],
+ ['grpFins','xFinRootLE',    'Fin root LE station',   'm',      'V', 1,        3.25,     0.05],
+ ['grpFins','finThickness',  'Fin thickness',         'm',      'V', 1,        0.004,    0.001],
+ ['grpFins','finProfile',    'Fin edge profile',      '',       'V', 'sel2',   'rounded',0],
+ ['grpFins','cRollDamp',     'Roll damping scale',    '-',      'V', 1,        1.00,     0.05],
+ ['grpFins','xNozzleExit',   'Nozzle exit station',   'm',      'V', 1,        3.60,     0.05],
+
+ ['grpEnv','railLength',     'Rail length',           'm',      'V', 1,        8.0,      0.5],
+ ['grpEnv','railElevation',  'Rail elevation',        'deg',    'V', DEG,      88,       1],
+ ['grpEnv','railAzimuth',    'Rail azimuth',          'deg',    'V', DEG,      0,        5],
+ ['grpEnv','hLaunch',        'Pad altitude ASL',      'm',      'V', 1,        0,        50],
+ ['grpEnv','windE',          'Wind toward East',      'm/s',    'V', 1,        2.0,      0.5],
+ ['grpEnv','windN',          'Wind toward North',     'm/s',    'V', 1,        0.0,      0.5],
+ ['grpEnv','windRefAlt',     'Wind ref. altitude',    'm',      'V', 1,        10.0,     1],
+ ['grpEnv','windAlphaExp',   'Wind profile exponent', '-',      'V', 1,        0.1429,   0.01],
+
+ ['grpSolver','tEndFlight',  'Max flight time',       's',      'V', 1,        400,      10],
+ ['grpSolver','relTol',      'Relative tolerance',    '-',      'V', 1,        1e-6,     1e-7]
+];
+
+/* Monte Carlo run controls (not physical parameters) */
+var MC_SPEC = [
+ ['nRuns',   'Number of cases',   '-', 400,   50],
+ ['seed',    'RNG seed',          '-', 12345, 1],
+ ['mcRelTol','MC tolerance',      '-', 1e-5,  1e-6],
+ ['keepTraces','Traces to plot',  '-', 60,    10]
+];
+
+/* Units shown next to each 1-sigma box */
+var SIG_UNIT = {
+  kInj:'%', ofRatio:'%', mFuel0:'%', mOx0:'%', pTank0:'%', aThroat:'%',
+  cAscale:'%', cNaScale:'%', xCpShift:'m', mDry:'%', xCgDry:'m',
+  iYyDry:'%', windMag:'m/s', railElevation:'deg', railAzimuth:'deg',
+  thrustCant:'deg', cgOffsetY:'m', finCant:'deg'
+};
+
+var els = {};
+function buildInputs() {
+  SPEC.forEach(function (s) {
+    var group = document.getElementById(s[0]);
+    var row = document.createElement('div'); row.className = 'f';
+    var lab = document.createElement('label'); lab.textContent = s[2];
+    var inp;
+    if (s[5] === 'sel' || s[5] === 'sel2') {
+      inp = document.createElement('select');
+      (s[5] === 'sel2' ? ['rounded','square','airfoil'] : ['ogive','cone'])
+        .forEach(function (o) {
+        var op = document.createElement('option');
+        op.value = o; op.textContent = o; inp.appendChild(op);
+      });
+      inp.value = s[6];
+    } else {
+      inp = document.createElement('input');
+      inp.type = 'number'; inp.step = s[7]; inp.value = s[6];
+    }
+    inp.id = 'in_' + s[1];
+    var u = document.createElement('span'); u.className = 'u'; u.textContent = s[3];
+    row.appendChild(lab); row.appendChild(inp); row.appendChild(u);
+    group.appendChild(row);
+    els[s[1]] = inp;
+    inp.addEventListener('input', updateDerived);
+    inp.addEventListener('change', updateDerived);
+  });
+}
+
+var sigEls = {}, mcEls = {};
+function buildDispersionInputs() {
+  var gRun = document.getElementById('grpMcRun');
+  MC_SPEC.forEach(function (m) {
+    var row = document.createElement('div'); row.className = 'f';
+    var lab = document.createElement('label'); lab.textContent = m[1];
+    var inp = document.createElement('input');
+    inp.type = 'number'; inp.step = m[4]; inp.value = m[3];
+    inp.id = 'mc_' + m[0];
+    var u = document.createElement('span'); u.className = 'u'; u.textContent = m[2];
+    row.appendChild(lab); row.appendChild(inp); row.appendChild(u);
+    gRun.appendChild(row);
+    mcEls[m[0]] = inp;
+  });
+
+  var gSig = document.getElementById('grpSigma');
+  PH.DISP_SPEC.forEach(function (d) {
+    var key = d[0];
+    var row = document.createElement('div'); row.className = 'f';
+    var lab = document.createElement('label'); lab.textContent = d[2];
+    var inp = document.createElement('input');
+    inp.type = 'number'; inp.min = 0; inp.id = 'sig_' + key;
+    inp.value = d[4];
+    inp.step = (d[3] === 'pct') ? 0.5 : (d[4] < 0.05 ? 0.001 : 0.1);
+    var u = document.createElement('span'); u.className = 'u';
+    u.textContent = SIG_UNIT[key] || (d[3] === 'pct' ? '%' : '');
+    row.appendChild(lab); row.appendChild(inp); row.appendChild(u);
+    gSig.appendChild(row);
+    sigEls[key] = inp;
+  });
+}
+
+function readSigmas() {
+  var s = {};
+  PH.DISP_SPEC.forEach(function (d) {
+    var v = parseFloat(sigEls[d[0]].value);
+    s[d[0]] = isFinite(v) ? Math.max(v, 0) : 0;
+  });
+  // Wind direction is only dispersed when the wind speed is: that keeps
+  // "every sigma zero" a genuinely deterministic run.
+  s.windDirUniform = s.windMag > 0;
+  return s;
+}
+
+function readMcOpts() {
+  function num(k, def) {
+    var v = parseFloat(mcEls[k].value);
+    return isFinite(v) ? v : def;
+  }
+  return {
+    nRuns: Math.max(2, Math.round(num('nRuns', 400))),
+    seed: Math.round(num('seed', 12345)),
+    relTol: Math.max(1e-9, num('mcRelTol', 1e-5)),
+    keepTraces: Math.max(0, Math.round(num('keepTraces', 60)))
+  };
+}
+
+function readParams() {
+  var P = {}, V = {}, ok = true;
+  SPEC.forEach(function (s) {
+    var el = els[s[1]], tgt = (s[4] === 'P') ? P : V;
+    if (s[5] === 'sel' || s[5] === 'sel2') { tgt[s[1]] = el.value; return; }
+    var raw = parseFloat(el.value);
+    if (!isFinite(raw)) { el.classList.add('bad'); ok = false; return; }
+    el.classList.remove('bad');
+    tgt[s[1]] = raw * s[5];
+  });
+  return ok ? { P:P, V:V } : null;
+}
+
+function resetParams() {
+  SPEC.forEach(function (s) { els[s[1]].value = s[6]; });
+  updateDerived();
+}
+
+/* ---------- live derived readout (no integration) ---------- */
+function updateDerived() {
+  var pv = readParams();
+  var box = document.getElementById('derived');
+  if (!pv) { box.innerHTML = '<div>Invalid input</div>'; return; }
+  var P = pv.P, V = pv.V;
+  var mp = PH.massProperties(P.mFuel0, P.mOx0, V, P);
+  var geo = PH.aeroGeometry(V);
+  var atm = PH.atmosphereISA(V.hLaunch);
+  var reRef = 0.3*atm.a*geo.lRef/atm.nu;
+  var aero = PH.aeroCoefficients(0.3, geo, V, reRef, true, P.aExit, 0);
+  var comb = PH.combustionSolver(P.ofRatio);
+  var eng = PH.engineDynamics([P.mFuel0, P.mOx0, P.pChamber0, P.pTank0],
+                              P, Math.max(atm.p, 1));
+  var margin = (aero.xCp - mp.xCg)/V.dBody;
+  var tw = eng.thrust/(mp.m*PH.G0);
+  function row(k, v) { return '<div><span>'+k+'</span><b>'+v+'</b></div>'; }
+  box.innerHTML =
+    row('Expansion ratio', (P.aExit/P.aThroat).toFixed(2)) +
+    row('Flame temp',      comb.tChamber.toFixed(0)+' K') +
+    row('γ / MW',          comb.gamma.toFixed(3)+' / '+comb.mwMix.toFixed(1)) +
+    row('Liftoff mass',    mp.m.toFixed(1)+' kg') +
+    row('CG / CP (wet)',   mp.xCg.toFixed(2)+' / '+aero.xCp.toFixed(2)+' m') +
+    row('Static margin',   margin.toFixed(2)+' cal') +
+    row('Initial T/W',     tw.toFixed(2)) +
+    row('CD0 at M=0.3',    aero.cA.toFixed(3)) +
+    row('&nbsp;&nbsp;friction / base', aero.cdParts.friction.toFixed(3)+
+                           ' / '+aero.cdParts.base.toFixed(3)) +
+    row('Ox fill',         mp.lenOx.toFixed(2)+' / '+V.lTankOx.toFixed(2)+' m') +
+    row('Fuel fill',       mp.lenFuel.toFixed(2)+' / '+V.lTankFuel.toFixed(2)+' m');
+}
+
+/* ============================ PLOTTING ============================ */
+var C = { grid:'#232a34', axis:'#3a4553', text:'#dbe3ec', muted:'#8b97a8' };
+var PAL = ['#ff7a45','#4dd0e1','#7bd88f','#f2c14e','#b48ead','#e06c75'];
+
+function niceNum(range, round) {
+  var exp = Math.floor(Math.log10(range)), f = range/Math.pow(10, exp), nf;
+  if (round) nf = f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10;
+  else       nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  return nf*Math.pow(10, exp);
+}
+function axisTicks(lo, hi, n) {
+  if (!isFinite(lo) || !isFinite(hi) || hi - lo < 1e-12) { lo -= 0.5; hi += 0.5; }
+  var step = niceNum(niceNum(hi - lo, false)/(n - 1), true);
+  var gl = Math.floor(lo/step)*step, gh = Math.ceil(hi/step)*step;
+  var out = [];
+  for (var v = gl; v <= gh + step*0.5; v += step) out.push(+v.toPrecision(12));
+  return { t:out, lo:gl, hi:gh };
+}
+function fmtTick(v) {
+  var a = Math.abs(v);
+  if (a === 0) return '0';
+  if (a >= 1e5 || a < 1e-3) return v.toExponential(0);
+  if (a >= 100) return v.toFixed(0);
+  if (a >= 10) return v.toFixed(1);
+  if (a >= 1) return v.toFixed(2);
+  return v.toFixed(3);
+}
+function extent(arrs) {
+  var lo = Infinity, hi = -Infinity;
+  arrs.forEach(function (a) {
+    for (var i = 0; i < a.length; i++) {
+      var v = a[i];
+      if (!isFinite(v)) continue;
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+  });
+  return [lo, hi];
+}
+
+function drawPlot(cv, cfg) {
+  cv._cfg = cfg;
+  var dpr = window.devicePixelRatio || 1;
+  var w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr);
+  var g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  g.font = '10px -apple-system,Segoe UI,Roboto,sans-serif';
+
+  var has2 = cfg.series.some(function (s) { return s.axis === 2; });
+  var L = cfg.padLeft || 52, R = has2 ? 50 : 14, T = 24, B = 30;
+  var pw = w - L - R, ph = h - T - B;
+  if (pw <= 10 || ph <= 10) return;
+
+  var s1 = cfg.series.filter(function (s) { return s.axis !== 2; });
+  var s2 = cfg.series.filter(function (s) { return s.axis === 2; });
+  var xe = cfg.xlim || extent(cfg.series.map(function (s) { return s.x; }));
+  var ye = cfg.ylim || extent(s1.map(function (s) { return s.y; }));
+  var y2e = s2.length ? extent(s2.map(function (s) { return s.y; })) : null;
+
+  var xa = axisTicks(xe[0], xe[1], 6);
+  var ya = cfg.yCats
+    ? { t:cfg.yCats.map(function (_, i) { return i; }),
+        lo:-0.7, hi:cfg.yCats.length - 0.3 }
+    : axisTicks(ye[0], ye[1], 5);
+  var y2a = y2e ? axisTicks(y2e[0], y2e[1], 5) : null;
+
+  if (cfg.equal) {                       // equal aspect (ground track)
+    var xr = xa.hi - xa.lo, yr = ya.hi - ya.lo;
+    var sx = pw/xr, sy = ph/yr, s = Math.min(sx, sy);
+    var cxm = (xa.lo + xa.hi)/2, cym = (ya.lo + ya.hi)/2;
+    xa.lo = cxm - pw/(2*s); xa.hi = cxm + pw/(2*s);
+    ya.lo = cym - ph/(2*s); ya.hi = cym + ph/(2*s);
+    xa.t = axisTicks(xa.lo, xa.hi, 6).t.filter(function (v) { return v >= xa.lo && v <= xa.hi; });
+    ya.t = axisTicks(ya.lo, ya.hi, 5).t.filter(function (v) { return v >= ya.lo && v <= ya.hi; });
+  }
+
+  var X = function (v) { return L + (v - xa.lo)/(xa.hi - xa.lo)*pw; };
+  var Y = function (v) { return T + ph - (v - ya.lo)/(ya.hi - ya.lo)*ph; };
+  var Y2 = y2a ? function (v) { return T + ph - (v - y2a.lo)/(y2a.hi - y2a.lo)*ph; } : null;
+  cv._map = { X:X, Y:Y, L:L, T:T, pw:pw, ph:ph, xa:xa };
+
+  /* grid + ticks */
+  g.strokeStyle = C.grid; g.lineWidth = 1; g.fillStyle = C.muted;
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  ya.t.forEach(function (v, vi) {
+    if (v < ya.lo - 1e-9 || v > ya.hi + 1e-9) return;
+    var y = Y(v);
+    if (!cfg.yCats) {
+      g.beginPath(); g.moveTo(L, y + .5); g.lineTo(L + pw, y + .5); g.stroke();
+    }
+    g.fillText(cfg.yCats ? cfg.yCats[vi] : fmtTick(v), L - 6, y);
+  });
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  xa.t.forEach(function (v) {
+    if (v < xa.lo - 1e-9 || v > xa.hi + 1e-9) return;
+    var x = X(v);
+    g.beginPath(); g.moveTo(x + .5, T); g.lineTo(x + .5, T + ph); g.stroke();
+    g.fillText(fmtTick(v), x, T + ph + 6);
+  });
+  if (y2a) {
+    g.textAlign = 'left'; g.textBaseline = 'middle';
+    g.fillStyle = s2[0].color;
+    y2a.t.forEach(function (v) {
+      if (v < y2a.lo - 1e-9 || v > y2a.hi + 1e-9) return;
+      g.fillText(fmtTick(v), L + pw + 6, Y2(v));
+    });
+  }
+
+  /* frame */
+  g.strokeStyle = C.axis;
+  g.strokeRect(L + .5, T + .5, pw, ph);
+
+  /* reference lines */
+  (cfg.vlines || []).forEach(function (vl) {
+    if (vl.x < xa.lo || vl.x > xa.hi) return;
+    var x = X(vl.x);
+    g.save(); g.setLineDash([3,3]); g.strokeStyle = vl.color || '#4a5563';
+    g.beginPath(); g.moveTo(x + .5, T); g.lineTo(x + .5, T + ph); g.stroke();
+    g.restore();
+    if (vl.label) {
+      g.fillStyle = vl.color || '#6b7889';
+      g.textAlign = 'center'; g.textBaseline = 'top';
+      g.fillText(vl.label, x, T + 2);
+    }
+  });
+  (cfg.hlines || []).forEach(function (hl) {
+    if (hl.y < ya.lo || hl.y > ya.hi) return;
+    var y = Y(hl.y);
+    g.save(); g.setLineDash([3,3]); g.strokeStyle = hl.color || '#4a5563';
+    g.beginPath(); g.moveTo(L, y + .5); g.lineTo(L + pw, y + .5); g.stroke();
+    g.restore();
+  });
+
+  /* series */
+  g.save();
+  g.beginPath(); g.rect(L, T, pw, ph); g.clip();
+  cfg.series.forEach(function (s) {
+    var mapY = (s.axis === 2) ? Y2 : Y;
+    g.strokeStyle = s.color; g.fillStyle = s.color;
+    g.lineWidth = s.width || 1.6; g.lineJoin = 'round';
+    g.globalAlpha = (s.alpha === undefined) ? 1 : s.alpha;
+    var i, px, py;
+
+    if (s.type === 'scatter') {
+      var rad = s.radius || 2.2;
+      for (i = 0; i < s.x.length; i++) {
+        if (!isFinite(s.y[i])) continue;
+        g.beginPath();
+        g.arc(X(s.x[i]), mapY(s.y[i]), rad, 0, 2*Math.PI);
+        g.fill();
+      }
+    } else if (s.type === 'vbar') {         // histogram
+      var wpx = Math.max(1, X(s.binW) - X(0) - 1);
+      var y0 = mapY(0);
+      for (i = 0; i < s.x.length; i++) {
+        if (!isFinite(s.y[i])) continue;
+        py = mapY(s.y[i]);
+        g.fillRect(X(s.x[i]) - wpx/2, Math.min(py, y0),
+                   wpx, Math.abs(y0 - py));
+      }
+    } else if (s.type === 'hbar') {         // sensitivity bars
+      var slot = ph/Math.max(cfg.yCats.length, 1);
+      var th = Math.max(3, slot*0.34);
+      var x0 = X(0);
+      for (i = 0; i < s.x.length; i++) {
+        if (!isFinite(s.x[i])) continue;
+        px = X(s.x[i]);
+        var yc = Y(i) + (s.slot || 0)*th - th/2;
+        g.fillRect(Math.min(px, x0), yc, Math.abs(px - x0), th);
+      }
+    } else {                                 // polyline
+      g.beginPath();
+      var started = false;
+      for (i = 0; i < s.x.length; i++) {
+        var yv = s.y[i];
+        if (!isFinite(yv)) { started = false; continue; }
+        px = X(s.x[i]); py = mapY(yv);
+        if (!started) { g.moveTo(px, py); started = true; }
+        else g.lineTo(px, py);
+      }
+      if (s.closed) g.closePath();
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  });
+
+  /* point markers */
+  (cfg.markers || []).forEach(function (m) {
+    var px = X(m.x), py = Y(m.y);
+    g.fillStyle = m.color; g.strokeStyle = '#0d1117'; g.lineWidth = 1.2;
+    g.beginPath();
+    if (m.shape === 'tri') {
+      g.moveTo(px, py - 6); g.lineTo(px + 5.5, py + 4);
+      g.lineTo(px - 5.5, py + 4); g.closePath();
+    } else if (m.shape === 'star') {
+      for (var k = 0; k < 10; k++) {
+        var ang = -Math.PI/2 + k*Math.PI/5, rr = (k % 2 ? 3 : 7);
+        var fx = px + rr*Math.cos(ang), fy = py + rr*Math.sin(ang);
+        if (k === 0) g.moveTo(fx, fy); else g.lineTo(fx, fy);
+      }
+      g.closePath();
+    } else {
+      g.arc(px, py, 4.5, 0, 2*Math.PI);
+    }
+    g.fill(); g.stroke();
+  });
+  g.restore();
+
+  /* title + axis labels */
+  g.fillStyle = C.text; g.textAlign = 'left'; g.textBaseline = 'top';
+  g.font = '11.5px -apple-system,Segoe UI,Roboto,sans-serif';
+  g.fillText(cfg.title, L, 5);
+  g.font = '10px -apple-system,Segoe UI,Roboto,sans-serif';
+  g.fillStyle = C.muted; g.textAlign = 'right'; g.textBaseline = 'bottom';
+  g.fillText(cfg.xlabel || '', L + pw, h - 1);
+  g.save();
+  g.translate(9, T); g.rotate(-Math.PI/2);
+  g.textAlign = 'right'; g.textBaseline = 'top';
+  g.fillText(cfg.ylabel || '', 0, 0);
+  g.restore();
+
+  /* watermark */
+  g.save();
+  g.font = '9px -apple-system,Segoe UI,Roboto,sans-serif';
+  g.fillStyle = 'rgba(255,122,69,0.34)';
+  g.textAlign = 'right'; g.textBaseline = 'bottom';
+  g.fillText(BYLINE, L + pw - 5, T + ph - 4);
+  g.restore();
+
+  /* legend */
+  if (cfg.series.length > 1) {
+    var lx = L + pw - 6, ly = T + 5;
+    g.textAlign = 'right'; g.textBaseline = 'top';
+    cfg.series.forEach(function (s, i) {
+      g.fillStyle = s.color;
+      g.fillText(s.label, lx, ly + i*13);
+    });
+  }
+
+  /* crosshair readout */
+  if (cfg.hover != null && !cfg.equal) {
+    var idx = cfg.hover;
+    var xv = cfg.series[0].x[idx];
+    if (xv >= xa.lo && xv <= xa.hi) {
+      var hx = X(xv);
+      g.strokeStyle = '#5d6b7d'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(hx + .5, T); g.lineTo(hx + .5, T + ph); g.stroke();
+      var lines = [(cfg.xlabel || 'x').split(' [')[0] + ' ' + fmtTick(xv)];
+      cfg.series.forEach(function (s) {
+        lines.push(s.label + ' ' + fmtTick(s.y[idx]));
+      });
+      g.font = '10px ui-monospace,Menlo,Consolas,monospace';
+      var bw = 0;
+      lines.forEach(function (t) { bw = Math.max(bw, g.measureText(t).width); });
+      bw += 10;
+      var bh = lines.length*12 + 6;
+      var bx = (hx + bw + 10 < L + pw) ? hx + 8 : hx - bw - 8;
+      var by = T + 4;
+      g.fillStyle = 'rgba(13,17,23,.92)';
+      g.strokeStyle = '#39424f';
+      g.beginPath(); g.rect(bx, by, bw, bh); g.fill(); g.stroke();
+      g.textAlign = 'left'; g.textBaseline = 'top';
+      lines.forEach(function (t, i) {
+        g.fillStyle = i === 0 ? C.muted : cfg.series[i-1].color;
+        g.fillText(t, bx + 5, by + 4 + i*12);
+      });
+    }
+  }
+}
+
+function attachHover(cv) {
+  cv.addEventListener('mousemove', function (e) {
+    var cfg = cv._cfg, map = cv._map;
+    if (!cfg || !map || cfg.equal) return;
+    var r = cv.getBoundingClientRect();
+    var px = e.clientX - r.left;
+    var xv = map.xa.lo + (px - map.L)/map.pw*(map.xa.hi - map.xa.lo);
+    var xs = cfg.series[0].x, best = 0, bd = Infinity;
+    for (var i = 0; i < xs.length; i++) {
+      var d = Math.abs(xs[i] - xv);
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (cfg.hover !== best) { cfg.hover = best; drawPlot(cv, cfg); }
+  });
+  cv.addEventListener('mouseleave', function () {
+    var cfg = cv._cfg;
+    if (cfg && cfg.hover != null) { cfg.hover = null; drawPlot(cv, cfg); }
+  });
+}
+
+/* ============================ RUN + RENDER ============================ */
+var RESULT = null, PLOTS = [], MC_PLOTS = [];
+
+function decimate(H, maxPts) {
+  var n = H.t.length;
+  var stride = Math.max(1, Math.ceil(n/maxPts));
+  var idx = [];
+  for (var i = 0; i < n; i += stride) idx.push(i);
+  if (idx[idx.length-1] !== n-1) idx.push(n-1);
+  var D = {};
+  Object.keys(H).forEach(function (k) {
+    var src = H[k];
+    if (typeof src.length !== 'number') { D[k] = src; return; }
+    var out = new Array(idx.length);
+    for (var j = 0; j < idx.length; j++) out[j] = src[idx[j]];
+    D[k] = out;
+  });
+  return D;
+}
+
+function card(k, v, unit) {
+  return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+
+         (unit ? '<small>'+unit+'</small>' : '')+'</div></div>';
+}
+
+function render() {
+  var H = RESULT.H, S = RESULT.summary;
+  var D = decimate(H, 1600);
+
+  document.getElementById('cards').innerHTML =
+    card('Apogee', S.apogee.toFixed(0), 'm AGL') +
+    card('Time to apogee', S.tApogee.toFixed(1), 's') +
+    card('Max speed', S.vMax.toFixed(0), 'm/s') +
+    card('Max Mach', S.machMax.toFixed(2), '') +
+    card('Rail exit speed', S.vRail.toFixed(1), 'm/s') +
+    card('Initial T/W', S.twRatio.toFixed(2), '') +
+    card('Burn time', S.tBurn.toFixed(1), 's') +
+    card('Total impulse', (S.totalImpulse/1000).toFixed(1), 'kN·s') +
+    card('Mean Isp', S.ispMean.toFixed(0), 's') +
+    card('Max accel', S.accMax.toFixed(2), 'g') +
+    card('Max dyn. press.', (S.qBarMax/1000).toFixed(1), 'kPa') +
+    card('Max α (boost)', S.alphaMaxBoost.toFixed(1), '°') +
+    card('Min margin', S.marginMinBoost.toFixed(2), 'cal') +
+    card('Tilt at burnout', S.tiltBurn.toFixed(1), '°') +
+    card(S.landed ? 'Impact range' : 'Range at t_end', S.rangeLand.toFixed(0), 'm') +
+    card('Flight time', S.tLand.toFixed(1), 's');
+
+  var warn = [];
+  if (S.marginMinBoost < 1.0)
+    warn.push('Static margin drops to '+S.marginMinBoost.toFixed(2)+
+              ' cal during boost. Below about 1 cal the vehicle is aerodynamically unstable.');
+  if (S.marginMinBoost > 3.0)
+    warn.push('Static margin is '+S.marginMinBoost.toFixed(1)+
+              ' cal, against a typical 1.5 to 2.5. That is very overstable, so the vehicle weathercocks hard into the wind and loses altitude to the gravity turn. '+
+              'Impact range is '+S.rangeLand.toFixed(0)+' m.');
+  if (S.twRatio < 1.5)
+    warn.push('Initial thrust-to-weight is '+S.twRatio.toFixed(2)+
+              '. Below about 2 the rail exit speed is marginal.');
+  if (S.vRail < 20)
+    warn.push('Rail exit speed is '+S.vRail.toFixed(1)+
+              ' m/s. Typically 20 m/s or more is wanted for fin authority.');
+  if (!S.landed)
+    warn.push('Simulation hit the max flight time before touchdown.');
+  var mpChk = PH.massProperties(readParams().P.mFuel0, readParams().P.mOx0,
+                                readParams().V, readParams().P);
+  if (mpChk.overfull)
+    warn.push('The propellant load does not fit the tank dimensions. The ' +
+      'liquid column was clamped to the tank length, so the mass properties ' +
+      'are not physical. Increase the tank length or radius.');
+  var b = document.getElementById('banner');
+  b.className = 'banner warn' + (warn.length ? ' show' : '');
+  b.innerHTML = warn.map(function (t) { return '• ' + t; }).join('<br>');
+
+  var vl = [
+    { x:S.tRail,   color:'#5b6b7f', label:'rail' },
+    { x:S.tBurn,   color:'#8a6b4f', label:'burnout' },
+    { x:S.tApogee, color:'#4f6b7f', label:'apogee' }
+  ];
+  var TL = 'Time [s]';
+  PLOTS = [
+    ['pTraj', { title:'Altitude vs downrange', xlabel:'Downrange [m]',
+      ylabel:'Altitude [m]', series:[
+        { x:D.downrange, y:D.alt, color:PAL[0], label:'trajectory' }] }],
+    ['pGround', { title:'Ground track', xlabel:'East [m]', ylabel:'North [m]',
+      equal:true, series:[
+        { x:D.posE, y:D.posN, color:PAL[1], label:'track' }] }],
+    ['pAlt', { title:'Altitude', xlabel:TL, ylabel:'Altitude AGL [m]',
+      vlines:vl, series:[
+        { x:D.t, y:D.alt, color:PAL[0], label:'altitude' }] }],
+    ['pSpeed', { title:'Speed and Mach', xlabel:TL, ylabel:'Airspeed [m/s]',
+      vlines:vl, series:[
+        { x:D.t, y:D.vMag, color:PAL[1], label:'airspeed' },
+        { x:D.t, y:D.mach, color:PAL[3], label:'Mach', axis:2 }] }],
+    ['pThrust', { title:'Thrust and mass', xlabel:TL, ylabel:'Thrust [N]',
+      vlines:vl, series:[
+        { x:D.t, y:D.thrust, color:PAL[0], label:'thrust' },
+        { x:D.t, y:D.mass, color:PAL[2], label:'mass [kg]', axis:2 }] }],
+    ['pPress', { title:'Chamber and tank pressure', xlabel:TL,
+      ylabel:'Pressure [bar]', vlines:vl, series:[
+        { x:D.t, y:D.pChamber.map(function (v) { return v/1e5; }),
+          color:PAL[0], label:'chamber' },
+        { x:D.t, y:D.pTank.map(function (v) { return v/1e5; }),
+          color:PAL[4], label:'tank' }] }],
+    ['pAlpha', { title:'Angle of attack', xlabel:TL, ylabel:'α [deg]',
+      vlines:vl, series:[
+        { x:D.t, y:D.alpha, color:PAL[3], label:'α' }] }],
+    ['pMargin', { title:'Static margin', xlabel:TL, ylabel:'Margin [cal]',
+      vlines:vl, hlines:[{ y:1.0, color:'#7a4a4a' }], series:[
+        { x:D.t, y:D.margin, color:PAL[2], label:'margin' }] }],
+    ['pRates', { title:'Body rates', xlabel:TL, ylabel:'[deg/s]',
+      vlines:vl, series:[
+        { x:D.t, y:D.p, color:PAL[0], label:'p roll' },
+        { x:D.t, y:D.q, color:PAL[1], label:'q pitch' },
+        { x:D.t, y:D.r, color:PAL[2], label:'r yaw' }] }],
+    ['pTilt', { title:'Tilt from vertical', xlabel:TL, ylabel:'Tilt [deg]',
+      vlines:vl, series:[
+        { x:D.t, y:D.tilt, color:PAL[4], label:'tilt' }] }],
+    ['pQbar', { title:'Dynamic pressure', xlabel:TL, ylabel:'q̄ [kPa]',
+      vlines:vl, series:[
+        { x:D.t, y:D.qBar.map(function (v) { return v/1000; }),
+          color:PAL[5], label:'q̄' }] }],
+    ['pAccel', { title:'Acceleration magnitude', xlabel:TL, ylabel:'[g]',
+      vlines:vl, series:[
+        { x:D.t, y:D.accG, color:PAL[3], label:'|a|' }] }]
+  ];
+  PLOTS.forEach(function (p) { drawPlot(document.getElementById(p[0]), p[1]); });
+}
+
+function redrawAll() {
+  PLOTS.concat(MC_PLOTS).forEach(function (p) {
+    var cv = document.getElementById(p[0]);
+    if (cv && cv._cfg) drawPlot(cv, cv._cfg);
+  });
+}
+
+function setStatus(cls, txt) {
+  document.getElementById('dot').className = 'dot ' + cls;
+  document.getElementById('statusTxt').textContent = txt;
+}
+
+function run() {
+  var pv = readParams();
+  if (!pv) { setStatus('err', 'Fix the highlighted inputs'); return; }
+  var btn = document.getElementById('btnRun');
+  btn.disabled = true;
+  setStatus('run', 'Integrating…');
+  requestAnimationFrame(function () { setTimeout(function () {
+    try {
+      RESULT = PH.runFlight(pv.P, pv.V);
+      render();
+      var S = RESULT.summary;
+      setStatus('ok', 'Done: ' + S.steps.toLocaleString() + ' RK45 steps in ' +
+        S.wallMs.toFixed(0) + ' ms  ·  quaternion norm drift ' +
+        S.qDrift.toExponential(1));
+    } catch (err) {
+      console.error(err);
+      setStatus('err', 'Simulation failed: ' + err.message);
+    }
+    btn.disabled = false;
+  }, 10); });
+}
+
+/* ====================== MONTE CARLO DISPERSIONS ====================== */
+var MC = null;
+
+function histogram(vals, nBins) {
+  var lo = Infinity, hi = -Infinity, i;
+  for (i = 0; i < vals.length; i++) {
+    if (vals[i] < lo) lo = vals[i];
+    if (vals[i] > hi) hi = vals[i];
+  }
+  if (!(hi > lo)) { hi = lo + 1; }
+  var w = (hi - lo)/nBins;
+  var counts = new Array(nBins).fill(0), centres = new Array(nBins);
+  for (i = 0; i < nBins; i++) centres[i] = lo + w*(i + 0.5);
+  for (i = 0; i < vals.length; i++) {
+    var b = Math.min(nBins - 1, Math.floor((vals[i] - lo)/w));
+    counts[b]++;
+  }
+  return { x:centres, y:counts, binW:w };
+}
+
+function ellipsePts(imp, k) {
+  var ca = Math.cos(imp.angle), sa = Math.sin(imp.angle);
+  var xs = [], ys = [];
+  for (var i = 0; i <= 96; i++) {
+    var th = i/96*2*Math.PI;
+    var u = k*imp.semiMajor*Math.cos(th), v = k*imp.semiMinor*Math.sin(th);
+    xs.push(imp.meanE + u*ca - v*sa);
+    ys.push(imp.meanN + u*sa + v*ca);
+  }
+  return { x:xs, y:ys };
+}
+
+function runMonteCarlo() {
+  var pv = readParams();
+  if (!pv) { setStatus('err', 'Fix the highlighted inputs'); return; }
+  if (!RESULT) { setStatus('err', 'Run the nominal case first'); return; }
+
+  var opt = readMcOpts();
+  var sig = readSigmas();
+  var btn = document.getElementById('btnMc');
+  var btnR = document.getElementById('btnRun');
+  btn.disabled = true; btnR.disabled = true;
+  document.getElementById('prog').style.display = '';
+  document.getElementById('mcBlock').style.display = '';
+
+  var mc = PH.makeMonteCarlo(pv.P, pv.V, {
+    nRuns: opt.nRuns, seed: opt.seed, sigmas: sig,
+    qsChamber: true, relTol: opt.relTol, keepTraces: opt.keepTraces
+  });
+  var t0 = Date.now();
+
+  function tick() {
+    var done = mc.step(120);              // ~120 ms of work, then repaint
+    var f = mc.done()/mc.total;
+    document.getElementById('progBar').style.width = (f*100).toFixed(1) + '%';
+    var el = (Date.now() - t0)/1000;
+    var eta = f > 0.02 ? (el/f - el) : NaN;
+    setStatus('run', 'Monte Carlo ' + mc.done() + ' / ' + mc.total +
+      ' cases' + (isFinite(eta) ? '  ·  ~' + eta.toFixed(0) + ' s left' : ''));
+    if (done) {
+      MC = mc.result();
+      renderMc(opt, sig);
+      document.getElementById('prog').style.display = 'none';
+      setStatus('ok', 'Monte Carlo complete: ' + MC.n + ' cases in ' +
+        ((Date.now() - t0)/1000).toFixed(1) + ' s' +
+        (MC.failures ? ('  ·  ' + MC.failures + ' failed') : ''));
+      btn.disabled = false; btnR.disabled = false;
+      var blk = document.getElementById('mcBlock');
+      if (blk.scrollIntoView) blk.scrollIntoView({ behavior:'smooth' });
+    } else {
+      setTimeout(tick, 0);
+    }
+  }
+  setTimeout(tick, 10);
+}
+
+function renderMc(opt, sig) {
+  var S = MC.stats, I = MC.impact, nom = RESULT.summary;
+
+  document.getElementById('mcHead').textContent =
+    'Monte Carlo dispersions: ' + MC.n + ' cases, seed ' + opt.seed;
+
+  document.getElementById('mcCards').innerHTML =
+    card('Apogee (mean)', S.apogee.mean.toFixed(0), 'm') +
+    card('Apogee ±3σ', '±' + (3*S.apogee.sd).toFixed(0), 'm') +
+    card('Apogee 5-95%', S.apogee.p5.toFixed(0) + ' to ' + S.apogee.p95.toFixed(0), 'm') +
+    card('Nominal apogee', nom.apogee.toFixed(0), 'm') +
+    card('3σ footprint', (3*I.semiMajor).toFixed(0) + '×' + (3*I.semiMinor).toFixed(0), 'm') +
+    card('CEP (50%)', I.cep50.toFixed(0), 'm') +
+    card('95% radius', I.cep95.toFixed(0), 'm') +
+    card('Worst case range', S.rangeLand.max.toFixed(0), 'm') +
+    card('Max Mach ±3σ', S.machMax.mean.toFixed(2) + '±' + (3*S.machMax.sd).toFixed(2), '') +
+    card('Max q ±3σ', (S.qBarMax.mean/1e3).toFixed(1) + '±' + (3*S.qBarMax.sd/1e3).toFixed(1), 'kPa') +
+    card('Rail exit ±3σ', S.vRail.mean.toFixed(1) + '±' + (3*S.vRail.sd).toFixed(1), 'm/s') +
+    card('Min margin (worst)', S.marginMin.min.toFixed(2), 'cal');
+
+  /* warnings */
+  var warn = [];
+  var cv = S.apogee.sd/Math.max(S.apogee.mean, 1e-9);
+  if (cv > 0.25)
+    warn.push('Apogee σ is ' + (cv*100).toFixed(0) + '% of the mean. A spread ' +
+      'that large means the outcome is dominated by the attitude response, ' +
+      'not by the individual input tolerances. Look at the tilt-at-burnout ' +
+      'row in the table below.');
+  if (S.marginMin.min < 1.0)
+    warn.push('At least one case dropped below 1 cal static margin (worst ' +
+      S.marginMin.min.toFixed(2) + ' cal). That case was aerodynamically unstable.');
+  if (S.tiltBurn.mean > 60)
+    warn.push('Mean tilt at burnout is ' + S.tiltBurn.mean.toFixed(0) +
+      '°, so the vehicle is still thrusting well after it has turned over. ' +
+      'That is the main reason the footprint is so large.');
+  if (MC.failures)
+    warn.push(MC.failures + ' case(s) failed to integrate and were dropped.');
+  var mb = document.getElementById('mcBanner');
+  mb.className = 'banner warn' + (warn.length ? ' show' : '');
+  mb.innerHTML = warn.map(function (t) { return '• ' + t; }).join('<br>');
+
+  /* footprint */
+  var e1 = ellipsePts(I, 1), e2 = ellipsePts(I, 2), e3 = ellipsePts(I, 3);
+  var fpCfg = {
+    title:'Landing footprint: 1σ / 2σ / 3σ containment ellipses',
+    xlabel:'East [m]', ylabel:'North [m]', equal:true,
+    series:[
+      { x:MC.raw.impactE, y:MC.raw.impactN, type:'scatter', radius:2.2,
+        alpha:0.45, color:PAL[1], label:'cases' },
+      { x:e1.x, y:e1.y, color:PAL[2], width:1.4, label:'1σ' },
+      { x:e2.x, y:e2.y, color:PAL[3], width:1.4, label:'2σ' },
+      { x:e3.x, y:e3.y, color:PAL[0], width:1.8, label:'3σ (safety)' }
+    ],
+    markers:[
+      { x:0, y:0, color:'#dbe3ec', shape:'tri' },
+      { x:nom.rangeLand*Math.sin(Math.atan2(
+            RESULT.H.posE[RESULT.H.posE.length-1],
+            RESULT.H.posN[RESULT.H.posN.length-1])),
+        y:nom.rangeLand*Math.cos(Math.atan2(
+            RESULT.H.posE[RESULT.H.posE.length-1],
+            RESULT.H.posN[RESULT.H.posN.length-1])),
+        color:'#f2c14e', shape:'star' }
+    ]
+  };
+
+  /* sensitivity */
+  var top = MC.sens.slice(0, 10);
+  var sensCfg = {
+    title:'Sensitivity: correlation of input draw with outcome',
+    xlabel:'correlation', padLeft:132,
+    yCats: top.map(function (s) { return s.label; }),
+    xlim:[-1, 1],
+    series:[
+      { x:top.map(function (s) { return s.apogee; }),
+        y:top.map(function (_, i) { return i; }),
+        type:'hbar', slot:0, color:PAL[0], label:'apogee' },
+      { x:top.map(function (s) { return s.range; }),
+        y:top.map(function (_, i) { return i; }),
+        type:'hbar', slot:1, color:PAL[1], label:'impact range' }
+    ],
+    vlines:[{ x:0, color:'#4a5563' }]
+  };
+
+  function histCfg(vals, scale, title, xlabel, nomVal, st) {
+    var h = histogram(vals.map(function (v) { return v*scale; }), 32);
+    return {
+      title:title, xlabel:xlabel, ylabel:'count',
+      series:[{ x:h.x, y:h.y, binW:h.binW, type:'vbar', color:PAL[1],
+                alpha:0.85, label:'cases' }],
+      vlines:[
+        { x:nomVal*scale, color:PAL[0], label:'nom' },
+        { x:(st.mean - 3*st.sd)*scale, color:'#6b7889', label:'-3σ' },
+        { x:(st.mean + 3*st.sd)*scale, color:'#6b7889', label:'+3σ' }
+      ]
+    };
+  }
+
+  /* spaghetti */
+  var spagAlt = { title:'Trajectory envelope', xlabel:'Time [s]',
+    ylabel:'Altitude [m]', series:[] };
+  var spagDr = { title:'Altitude vs downrange', xlabel:'Downrange [m]',
+    ylabel:'Altitude [m]', series:[] };
+  MC.traces.forEach(function (tr) {
+    spagAlt.series.push({ x:tr.t, y:tr.alt, color:'#4dd0e1', width:1,
+      alpha:0.22, label:'' });
+    spagDr.series.push({ x:tr.dr, y:tr.alt, color:'#4dd0e1', width:1,
+      alpha:0.22, label:'' });
+  });
+  var Dn = decimate(RESULT.H, 400);
+  spagAlt.series.push({ x:Dn.t, y:Dn.alt, color:PAL[0], width:2,
+    label:'nominal' });
+  spagDr.series.push({ x:Dn.downrange, y:Dn.alt, color:PAL[0], width:2,
+    label:'nominal' });
+
+  var mcPlots = [
+    ['pFootprint', fpCfg],
+    ['pSens', sensCfg],
+    ['pHistApogee', histCfg(MC.raw.apogee, 1, 'Apogee distribution',
+       'Apogee [m]', nom.apogee, S.apogee)],
+    ['pHistRange', histCfg(MC.raw.rangeLand, 1, 'Impact range distribution',
+       'Range [m]', nom.rangeLand, S.rangeLand)],
+    ['pSpagAlt', spagAlt],
+    ['pSpagDr', spagDr],
+    ['pHistMach', histCfg(MC.raw.machMax, 1, 'Max Mach distribution',
+       'Mach [-]', nom.machMax, S.machMax)],
+    ['pHistQ', histCfg(MC.raw.qBarMax, 1e-3, 'Max dynamic pressure',
+       'q̄ [kPa]', nom.qBarMax, S.qBarMax)]
+  ];
+  mcPlots.forEach(function (p) {
+    drawPlot(document.getElementById(p[0]), p[1]);
+  });
+  MC_PLOTS = mcPlots;
+
+  /* percentile table */
+  var rows = [
+    ['Apogee', 'm', S.apogee, 1, nom.apogee],
+    ['Impact range', 'm', S.rangeLand, 1, nom.rangeLand],
+    ['Max Mach', '-', S.machMax, 1, nom.machMax],
+    ['Max dyn. pressure', 'kPa', S.qBarMax, 1e-3, nom.qBarMax],
+    ['Max acceleration', 'g', S.accMax, 1, nom.accMax],
+    ['Rail exit speed', 'm/s', S.vRail, 1, nom.vRail],
+    ['Min static margin', 'cal', S.marginMin, 1, nom.marginMinBoost],
+    ['Burn time', 's', S.tBurn, 1, nom.tBurn],
+    ['Time to apogee', 's', S.tApogee, 1, nom.tApogee],
+    ['Tilt at burnout', 'deg', S.tiltBurn, 1, nom.tiltBurn],
+    ['Peak roll rate', 'deg/s', S.rollMax, 1, 0],
+    ['Flight time', 's', S.tLand, 1, nom.tLand]
+  ];
+  var html = '<thead><tr><th>Metric</th><th>unit</th><th>nominal</th>' +
+    '<th>mean</th><th>σ</th><th>−3σ</th><th>5%</th><th>50%</th>' +
+    '<th>95%</th><th>+3σ</th><th>min</th><th>max</th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    var st = r[2], k = r[3];
+    function f(v) {
+      var x = v*k;
+      return (Math.abs(x) >= 100) ? x.toFixed(0)
+           : (Math.abs(x) >= 10) ? x.toFixed(1) : x.toFixed(2);
+    }
+    html += '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' +
+      f(r[4]) + '</td><td>' + f(st.mean) + '</td><td>' + f(st.sd) +
+      '</td><td>' + f(st.lo3) + '</td><td>' + f(st.p5) + '</td><td>' +
+      f(st.p50) + '</td><td>' + f(st.p95) + '</td><td>' + f(st.hi3) +
+      '</td><td>' + f(st.min) + '</td><td>' + f(st.max) + '</td></tr>';
+  });
+  document.getElementById('mcTable').innerHTML = html + '</tbody>';
+}
+
+function mcCsvText() {
+  var S = MC.stats, I = MC.impact;
+  var out = ['# N2O/ethanol 6DOF flight sim, ' + BYLINE,
+             '# Monte Carlo dispersion results, ' + MC.n + ' cases'];
+  out.push('# 3-sigma footprint semi-axes: ' + (3*I.semiMajor).toFixed(1) +
+           ' x ' + (3*I.semiMinor).toFixed(1) + ' m, major axis ' +
+           (I.angle*180/Math.PI).toFixed(1) + ' deg from East');
+  out.push('# CEP50 ' + I.cep50.toFixed(1) + ' m, 95% radius ' +
+           I.cep95.toFixed(1) + ' m');
+  out.push('');
+  out.push('metric,mean,sigma,minus3sigma,p5,p50,p95,plus3sigma,min,max');
+  var keys = [['apogee','apogee_m'],['rangeLand','impact_range_m'],
+    ['machMax','max_mach'],['qBarMax','max_qbar_Pa'],['accMax','max_accel_g'],
+    ['vRail','rail_exit_mps'],['marginMin','min_margin_cal'],
+    ['tBurn','burn_time_s'],['tApogee','t_apogee_s'],
+    ['tiltBurn','tilt_burnout_deg'],['rollMax','peak_roll_dps'],
+    ['tLand','flight_time_s']];
+  keys.forEach(function (k) {
+    var s = S[k[0]];
+    out.push([k[1], s.mean, s.sd, s.lo3, s.p5, s.p50, s.p95, s.hi3,
+              s.min, s.max].map(function (v) {
+      return typeof v === 'number' ? v.toPrecision(8) : v; }).join(','));
+  });
+  out.push('');
+  out.push('# sensitivity (correlation of normalised input draw with outcome)');
+  out.push('input,vs_apogee,vs_impact_range');
+  MC.sens.forEach(function (s) {
+    out.push([s.key, s.apogee.toFixed(4), s.range.toFixed(4)].join(','));
+  });
+  out.push('');
+  out.push('# per-case results');
+  out.push('case,apogee_m,impact_E_m,impact_N_m,impact_range_m,max_mach,' +
+           'max_qbar_Pa,rail_exit_mps,max_accel_g,min_margin_cal,' +
+           'burn_time_s,tilt_burnout_deg,peak_roll_dps,flight_time_s');
+  for (var i = 0; i < MC.n; i++) {
+    out.push((i + 1) + ',' + [MC.raw.apogee[i], MC.raw.impactE[i],
+      MC.raw.impactN[i], MC.raw.rangeLand[i], MC.raw.machMax[i],
+      MC.raw.qBarMax[i], MC.raw.vRail[i], MC.raw.accMax[i],
+      MC.raw.marginMin[i], MC.raw.tBurn[i], MC.raw.tiltBurn[i],
+      MC.raw.rollMax[i], MC.raw.tLand[i]].map(function (v) {
+        return v.toPrecision(7); }).join(','));
+  }
+  return out.join('\n');
+}
+
+/* ============================ EXPORTS ============================ */
+function showModal(title, text, filename) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalText').value = text;
+  document.getElementById('modal').classList.add('show');
+  document.getElementById('modalDl').onclick = function () {
+    var blob = new Blob([text], { type:'text/plain' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+}
+
+function csvText() {
+  var H = RESULT.H;
+  var cols = ['t','alt','downrange','posE','posN','velE','velN','velU','vMag',
+              'mach','thrust','mass','alpha','margin','qBar','accG','tilt',
+              'p','q','r','pChamber','pTank','isp','mDot','xCg','xCp'];
+  var rows = ['# N2O/ethanol 6DOF flight sim, ' + BYLINE,
+              '# SI units, angles in deg',
+              cols.join(',')];
+  for (var i = 0; i < H.t.length; i++) {
+    var r = new Array(cols.length);
+    for (var j = 0; j < cols.length; j++) {
+      var v = H[cols[j]][i];
+      r[j] = (Math.abs(v) < 1e-12) ? '0' : v.toPrecision(8);
+    }
+    rows.push(r.join(','));
+  }
+  return rows.join('\n');
+}
+
+function matlabText() {
+  var pv = readParams(); if (!pv) return '% invalid parameters';
+  var P = pv.P, V = pv.V;
+  function f(x) {
+    if (x === 0) return '0';
+    var a = Math.abs(x);
+    return (a < 1e-3 || a >= 1e5) ? x.toExponential(4) : String(+x.toPrecision(8));
+  }
+  return [
+'% N2O / ethanol 6DOF flight simulation, by Alessandro Valente',
+'% ---------------------------------------------------------------',
+'% Paste into engineParameters.m  (body of the function)',
+'% ---------------------------------------------------------------',
+'params.aThroat     = ' + f(P.aThroat) + ';',
+'params.aExit       = ' + f(P.aExit) + ';',
+'params.lStar       = ' + f(P.lStar) + ';',
+'params.pChamber0   = ' + f(P.pChamber0) + ';',
+'params.ofRatio     = ' + f(P.ofRatio) + ';',
+'params.mFuel0      = ' + f(P.mFuel0) + ';',
+'params.mOx0        = ' + f(P.mOx0) + ';',
+'params.pTank0      = ' + f(P.pTank0) + ';',
+'params.vUllage0    = ' + f(P.vUllage0) + ';',
+'params.kInj        = ' + f(P.kInj) + ';',
+'params.rhoFuel     = ' + f(P.rhoFuel) + ';',
+'params.rhoOx       = ' + f(P.rhoOx) + ';',
+'params.pChamberMin = ' + f(P.pChamberMin) + ';',
+'',
+'% ---------------------------------------------------------------',
+'% Paste into vehicleParameters.m  (body of the function)',
+'% ---------------------------------------------------------------',
+'veh.mDry          = ' + f(V.mDry) + ';',
+'veh.dBody         = ' + f(V.dBody) + ';',
+'veh.lTotal        = ' + f(V.lTotal) + ';',
+'veh.lNose         = ' + f(V.lNose) + ';',
+"veh.noseShape     = '" + V.noseShape + "';",
+'veh.xCgDry        = ' + f(V.xCgDry) + ';',
+'veh.iXxDry        = ' + f(V.iXxDry) + ';',
+'veh.iYyDry        = ' + f(V.iYyDry) + ';',
+'veh.xTankOxAft    = ' + f(V.xTankOxAft) + ';',
+'veh.rTankOx       = ' + f(V.rTankOx) + ';',
+'veh.lTankOx       = ' + f(V.lTankOx) + ';',
+'veh.xTankFuelAft  = ' + f(V.xTankFuelAft) + ';',
+'veh.rTankFuel     = ' + f(V.rTankFuel) + ';',
+'veh.lTankFuel     = ' + f(V.lTankFuel) + ';',
+'veh.nFins         = ' + f(V.nFins) + ';',
+'veh.finRootChord  = ' + f(V.finRootChord) + ';',
+'veh.finTipChord   = ' + f(V.finTipChord) + ';',
+'veh.finSpan       = ' + f(V.finSpan) + ';',
+'veh.finSweep      = ' + f(V.finSweep) + ';',
+'veh.xFinRootLE    = ' + f(V.xFinRootLE) + ';',
+'veh.finThickness  = ' + f(V.finThickness) + ';',
+"veh.finProfile    = '" + V.finProfile + "';",
+'veh.surfaceRoughness = ' + f(V.surfaceRoughness) + ';',
+'veh.cRollDamp     = ' + f(V.cRollDamp) + ';',
+'veh.xNozzleExit   = ' + f(V.xNozzleExit) + ';',
+'veh.railLength    = ' + f(V.railLength) + ';',
+'veh.railElevation = ' + f(V.railElevation/DEG) + ' * pi/180;',
+'veh.railAzimuth   = ' + f(V.railAzimuth/DEG) + ' * pi/180;',
+'veh.hLaunch       = ' + f(V.hLaunch) + ';',
+'veh.windSurface   = [' + f(V.windE) + '; ' + f(V.windN) + '; 0];',
+'veh.windRefAlt    = ' + f(V.windRefAlt) + ';',
+'veh.windAlphaExp  = ' + f(V.windAlphaExp) + ';',
+'veh.tEndFlight    = ' + f(V.tEndFlight) + ';',
+'veh.relTol        = ' + f(V.relTol) + ';',
+'veh.cAscale       = ' + f(V.cAscale) + ';',
+'veh.cNaScale      = 1;',
+'veh.xCpShift      = 0;',
+'veh.thrustCant    = 0;   veh.thrustClock = 0;',
+'veh.cgOffsetY     = 0;   veh.cgOffsetZ   = 0;',
+'veh.finCant       = 0;',
+'',
+'% ---------------------------------------------------------------',
+'% Paste into dispersionParameters.m  (1-sigma values)',
+'% ---------------------------------------------------------------',
+'disp.nRuns  = ' + readMcOpts().nRuns + ';',
+'disp.seed   = ' + readMcOpts().seed + ';',
+'disp.relTol = ' + f(readMcOpts().relTol) + ';',
+'disp.qsChamber = true;'
+  ].concat(PH.DISP_SPEC.map(function (d) {
+    var v = readSigmas()[d[0]];
+    var pad = '                '.slice(0, Math.max(1, 16 - d[0].length));
+    return 'disp.sigma.' + d[0] + pad + '= ' + f(v) + ';   % ' +
+           (SIG_UNIT[d[0]] || '') + '  ' + d[2];
+  })).join('\n');
+}
+
+/* ============================ WIRE-UP ============================ */
+buildInputs();
+buildDispersionInputs();
+updateDerived();
+['pTraj','pGround','pAlt','pSpeed','pThrust','pPress','pAlpha','pMargin',
+ 'pRates','pTilt','pQbar','pAccel','pHistApogee','pHistRange',
+ 'pHistMach','pHistQ'].forEach(function (id) {
+  attachHover(document.getElementById(id));
+});
+
+document.getElementById('btnRun').addEventListener('click', run);
+document.getElementById('btnMc').addEventListener('click', runMonteCarlo);
+document.getElementById('btnReset').addEventListener('click', function () {
+  resetParams();
+  MC_SPEC.forEach(function (m) { mcEls[m[0]].value = m[3]; });
+  PH.DISP_SPEC.forEach(function (d) { sigEls[d[0]].value = d[4]; });
+  document.getElementById('mcBlock').style.display = 'none';
+  MC = null; MC_PLOTS = [];
+  run();
+});
+document.getElementById('btnSigDefault').addEventListener('click', function () {
+  PH.DISP_SPEC.forEach(function (d) { sigEls[d[0]].value = d[4]; });
+});
+document.getElementById('btnSigZero').addEventListener('click', function () {
+  PH.DISP_SPEC.forEach(function (d) { sigEls[d[0]].value = 0; });
+});
+document.getElementById('btnCsv').addEventListener('click', function () {
+  if (MC) {
+    showModal('Monte Carlo results (CSV)', mcCsvText(), 'dispersion_results.csv');
+  } else if (RESULT) {
+    showModal('Time history (CSV)', csvText(), 'flight_history.csv');
+  } else {
+    setStatus('err', 'Run the simulation first');
+  }
+});
+document.getElementById('btnMat').addEventListener('click', function () {
+  showModal('MATLAB parameters', matlabText(), 'params.m');
+});
+document.getElementById('modalClose').addEventListener('click', function () {
+  document.getElementById('modal').classList.remove('show');
+});
+document.getElementById('modal').addEventListener('click', function (e) {
+  if (e.target === this) this.classList.remove('show');
+});
+document.getElementById('modalCopy').addEventListener('click', function () {
+  var ta = document.getElementById('modalText');
+  ta.select(); document.execCommand('copy');
+  this.textContent = 'Copied';
+  var self = this;
+  setTimeout(function () { self.textContent = 'Copy to clipboard'; }, 1200);
+});
+window.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') document.getElementById('modal').classList.remove('show');
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) run();
+});
+var rt;
+window.addEventListener('resize', function () {
+  clearTimeout(rt); rt = setTimeout(redrawAll, 120);
+});
+
+run();   // run the baseline case on load
+})();
+</script>
+</body>
+</html>
